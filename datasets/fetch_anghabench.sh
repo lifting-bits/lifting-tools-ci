@@ -63,7 +63,7 @@ while [[ $# -gt 0 ]] ; do
 		*)
 			# unknown option
 			echo "[x] Unknown option: ${key}"
-			return 1
+			exit 1
 		;;
 	esac
 

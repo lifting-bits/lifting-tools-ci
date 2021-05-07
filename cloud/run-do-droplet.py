@@ -39,6 +39,7 @@ if __name__ == "__main__":
     parser.add_argument("--script", required=True, help="Bash script to run on droplet start")
     parser.add_argument("--region", default="nyc3", help="DO region where to create droplet")
     parser.add_argument("--image", default="ubuntu-20-04-x64", help="OS Image to run on the droplet")
+    parser.add_argument("--dump-script", action="store_true", default=False, help="Do not create a droplet; dump script on stderr")
 
     parser.add_argument(
         "--instance",
@@ -100,4 +101,7 @@ if __name__ == "__main__":
         "tags": ["ci", "binary-lifting"],
     }
 
-    make_do_droplet(args.token, di)
+    if args.dump_script:
+        sys.stderr.write(full_script)
+    else:
+        make_do_droplet(args.token, di)

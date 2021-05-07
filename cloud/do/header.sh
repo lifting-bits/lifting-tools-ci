@@ -18,5 +18,13 @@ function exit_hook {
 trap exit_hook EXIT
 
 # pretty much required
+export DEBIAN_FRONTEND=noninteractive
 export SLACK_HOOK=__SLACK_HOOK__
 export RUN_NAME="__RUN_NAME__"
+export CI_BRANCH=__CI_BRANCH__
+
+if [[ "${CI_BRANCH,,}" = "__ci_branch__" ]]
+then
+     CI_BRANCH=master
+fi
+
