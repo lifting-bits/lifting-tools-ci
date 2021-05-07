@@ -83,6 +83,7 @@ if __name__ == "__main__":
         for prt in parts:
             p = prt.split('=')
             if len(p) > 1:
+                sys.stdout.write(f"Adding extra variable: {p[0]}={p[1]}\n")
                 VARS_TO_FIX[p[0]] = p[1]
 
     script_header = replace_vars(VARS_TO_FIX, open(do_header, 'r').read())
