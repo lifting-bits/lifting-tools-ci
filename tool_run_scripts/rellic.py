@@ -187,6 +187,11 @@ if __name__ == "__main__":
         action="store_true",
         help="Notify slack. SLACK_HOOK env var for the webhook",
     )
+    parser.add_argument(
+        "--run-name",
+        default="Rellic Batch Run",
+        help="A name to identify this batch run"
+    )
 
     args = parser.parse_args()
 
@@ -234,7 +239,7 @@ if __name__ == "__main__":
     # validity of msg_hook checked earlier
     if args.slack_notify:
         slack_msg = Slack(msg_hook)
-        slack_msg.add_header(f"Rellic AnghaBench Run Statistics")
+        slack_msg.add_header(f"{args.run_name}")
         slack_msg.add_block(f"Rellic Version: ```{version}```")
         slack_msg.add_divider()
 
