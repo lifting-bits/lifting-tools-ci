@@ -19,3 +19,4 @@ trap exit_hook EXIT
 
 # pretty much required
 export SLACK_HOOK=__SLACK_HOOK__
+export RUN_NAME="__RUN_NAME__"

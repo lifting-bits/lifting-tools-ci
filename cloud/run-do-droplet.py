@@ -28,9 +28,10 @@ def make_do_droplet(token, droplet_info):
 
 if __name__ == "__main__":
 
+    default_run_name=f"ci-run-{datetime.today().strftime('%Y-%m-%d')}"
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--name", default=f"ci-run-{datetime.today().strftime('%Y-%m-%d')}", help="Name to identify this instance")
+        "--name", default=default_run_name, help="Name to identify this run (NOT the DO hostname)")
     parser.add_argument(
         "--token", default=os.environ.get("DO_TOKEN", ""), help="DO Access Token")
 
@@ -90,7 +91,7 @@ if __name__ == "__main__":
     full_script = "\n".join([script_header, do_script, script_trailer])
 
     di = { 
-        "name": args.name,
+        "name": default_run_name,
         "region": args.region,
         "size": args.instance,
         "image": args.image,
