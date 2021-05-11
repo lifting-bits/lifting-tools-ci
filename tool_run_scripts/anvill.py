@@ -9,8 +9,14 @@ import os
 from pathlib import Path
 from tqdm import tqdm
 from multiprocessing import Pool
+from multiprocessing.pool import ThreadPool
 from functools import partial
 from toolcmd import ToolCmd
+from stats import Stats
+from slack import Slack
+from io import StringIO
+from datetime import datetime
+
 
 log = logging.getLogger("anvill_test_suite")
 log.addHandler(logging.StreamHandler())
@@ -46,11 +52,14 @@ class AnvillCmd(ToolCmd):
         if self.rc is None:
             raise RuntimeError("Return code never set")
 
-        pth = self.outdir.joinpath(self.get_output_path())
+        out_path_name = self.get_output_path()
+        pth = self.outdir.joinpath(out_path_name)
         pth = pth.joinpath(self.infile.relative_to(self.source_base))
 
         log.debug(f"Making dir: {pth}")
         os.makedirs(pth, exist_ok=True)
+
+        self.stats.add_stat(f"output.{out_path_name}", str(self.infile))
 
         input_name = pth.joinpath("input.elf")
         shutil.copyfile(self.infile, input_name)
@@ -80,9 +89,9 @@ class AnvillCmd(ToolCmd):
             reprofile.write(" ".join(self.cmd))
             reprofile.write("\n")
 
-def run_anvill(anvill, output_dir, failonly, source_path, input_and_idx):
+def run_anvill(anvill, output_dir, failonly, source_path, stats, input_and_idx):
     idx, input_file = input_and_idx
-    cmd = AnvillCmd(anvill, input_file, output_dir, source_path, idx)
+    cmd = AnvillCmd(anvill, input_file, output_dir, source_path, idx, stats)
 
     retcode = cmd.run()
     log.debug(f"Anvill run returned {retcode}")
@@ -97,6 +106,21 @@ def run_anvill(anvill, output_dir, failonly, source_path, input_and_idx):
 
     return cmd
 
+def get_anvill_version(cmd):
+    try:
+        rt =  subprocess.run([cmd, "--version"], timeout=30, capture_output=True)
+    except OSError as oe:
+        log.error(f"Could not get anvill version: {oe}")
+        sys.exit(1)
+    except subprocess.CalledProcessError as cpe:
+        log.error(f"Could not get anvill version: {cpe}")
+        sys.exit(1)
+    except subprocess.TimeoutExpired as tme:
+        log.error(f"Could not get anvill version: timeout execption")
+        sys.exit(1)
+
+    return rt.stdout.decode("utf-8")
+
 
 if __name__ == "__main__":
 
@@ -108,7 +132,10 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--anvill", default="python3 -m anvill", help="Which anvill to run"
+        "--anvill-python", default="python3 -m anvill", help="Which anvill python frontend to run"
+    )
+    parser.add_argument(
+        "--anvill-decompile", default="anvill-decompile-json-11.0", help="Which anvill decompiler to run"
     )
     parser.add_argument(
         "--input-dir",
@@ -133,14 +160,30 @@ if __name__ == "__main__":
         help="Notify slack about stats",
     )
 
+    parser.add_argument(
+        "--run-name",
+        default="Anvill Batch Run",
+        help="A name to identify this batch run"
+    )
+
     args = parser.parse_args()
 
-    test_anvill_args = args.anvill.split()
+    test_anvill_args = args.anvill_python.split()
     test_anvill_args.append("-h")
     anvill_test = subprocess.run(test_anvill_args, stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
     if anvill_test.returncode != 0:
         sys.stderr.write(f"Could not find anvill command: {args.anvill}\n")
         sys.exit(1)
+
+    if args.slack_notify:
+        msg_hook = os.environ.get("SLACK_HOOK", None)
+
+        if not msg_hook:
+            sys.stderr.write("Invalid webhook in SLACK_HOOK env var\n")
+            sys.exit(1)
+
+    version = get_anvill_version(args.anvill_decompile)
+    log.info(f"Running against Anvill:\n{version}")
 
     source_path = Path(args.input_dir)
     dest_path = Path(args.output_dir)
@@ -157,9 +200,37 @@ if __name__ == "__main__":
     
     num_cpus = os.cpu_count()
     max_items = len(sources)
-    apply_anvill = partial(run_anvill, args.anvill, dest_path, args.only_fails, source_path)
 
-    with Pool(processes=num_cpus) as p:
+    anvill_stats = Stats()
+    anvill_stats.set_stat("start_time", str(datetime.now()))
+
+    apply_anvill = partial(run_anvill, args.anvill_python, dest_path, args.only_fails, source_path, anvill_stats)
+
+
+    #with Pool(processes=num_cpus) as p:
+    with ThreadPool(num_cpus) as p:
         with tqdm(total=max_items) as pbar:
             for _ in p.imap_unordered(apply_anvill, enumerate(sources)):
                 pbar.update()
+
+    anvill_stats.set_stat("end_time", str(datetime.now()))
+
+    if args.slack_notify:
+        slack_msg = Slack(msg_hook)
+        slack_msg.add_header(f"{args.run_name}")
+        slack_msg.add_block(f"Anvill Version: ```{version}```")
+        slack_msg.add_divider()
+
+        with StringIO() as stat_msg:
+            anvill_stats.print_stats(stat_msg)
+            slack_msg.add_block(stat_msg.getvalue())
+
+        slack_msg.add_divider()
+
+        with StringIO() as fail_msg:
+            max_num_fails = 10
+            slack_msg.add_block(f"Top {max_num_fails}:")
+            anvill_stats.print_fails(fail_count=max_num_fails, output=fail_msg)
+            slack_msg.add_block(fail_msg.getvalue())
+        
+        slack_msg.post()
