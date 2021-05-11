@@ -75,7 +75,7 @@ if __name__ == "__main__":
     VARS_TO_FIX = {
         "DO_TOKEN": args.token,
         "SLACK_HOOK": os.environ["SLACK_HOOK"],
-        "BINJA_DECODE_KEY": os.environ.get("BINJA_DECODE_KEY", "")
+        "BINJA_DECODE_KEY": os.environ.get("BINJA_DECODE_KEY", ""),
         "RUN_NAME": args.name,
     }
 
