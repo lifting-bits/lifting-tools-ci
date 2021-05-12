@@ -172,7 +172,7 @@ if __name__ == "__main__":
     test_anvill_args.append("-h")
     anvill_test = subprocess.run(test_anvill_args, stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
     if anvill_test.returncode != 0:
-        sys.stderr.write(f"Could not find anvill command: {args.anvill}\n")
+        sys.stderr.write(f"Could not find anvill command: {args.anvill_python}\n")
         sys.exit(1)
 
     if args.slack_notify:
