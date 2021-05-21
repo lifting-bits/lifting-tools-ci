@@ -3,11 +3,14 @@ from threading import Lock
 import json
 from datetime import datetime
 
-
 class Stats:
     def __init__(self):
         self.lock = Lock()
         self.stats = {}
+
+    def load_json(self, fil):
+        with self.lock:
+            self.stats = json.load(fil)
 
     def save_json(self, filepath):
         with open(filepath, "w") as fo:
@@ -33,6 +36,11 @@ class Stats:
         for k, v in top_items[:fail_count]:
             k = k.replace("output.", "")
             output.write(f"`{k}`: `{len(v)}` failures\n")
+
+    def get_fail_count(self):
+        success_runs = len(self.stats.get("output.success", []))
+        program_runs = self.stats.get("program_runs", 0)
+        return program_runs - success_runs
 
     def print_stats(self, output=None):
         # emit start/end time
