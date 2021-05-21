@@ -193,6 +193,13 @@ if __name__ == "__main__":
         help="A name to identify this batch run"
     )
 
+    parser.add_argument(
+        "--dump-stats",
+        default=False,
+        action="store_true",
+        help="Output a stats.json in output directory with run statistics")
+
+
     args = parser.parse_args()
 
     if shutil.which(args.rellic) is None:
@@ -236,6 +243,12 @@ if __name__ == "__main__":
 
     rellic_stats.set_stat("end_time", str(datetime.now()))
 
+    max_num_fails = 10
+    outpath = dest_path.joinpath("stats.json")
+    rellic_stats.save_json(outpath)
+    rellic_stats.print_stats()
+    rellic_stats.print_fails(fail_count=max_num_fails)
+
     # validity of msg_hook checked earlier
     if args.slack_notify:
         slack_msg = Slack(msg_hook)
@@ -250,7 +263,6 @@ if __name__ == "__main__":
         slack_msg.add_divider()
 
         with StringIO() as fail_msg:
-            max_num_fails = 10
             slack_msg.add_block(f"Top {max_num_fails}:")
             rellic_stats.print_fails(fail_count=max_num_fails, output=fail_msg)
             slack_msg.add_block(fail_msg.getvalue())

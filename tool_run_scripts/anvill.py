@@ -166,6 +166,12 @@ if __name__ == "__main__":
         help="A name to identify this batch run"
     )
 
+    parser.add_argument(
+        "--dump-stats",
+        default=False,
+        action="store_true",
+        help="Output a stats.json in output directory with run statistics")
+
     args = parser.parse_args()
 
     test_anvill_args = args.anvill_python.split()
@@ -214,6 +220,10 @@ if __name__ == "__main__":
                 pbar.update()
 
     anvill_stats.set_stat("end_time", str(datetime.now()))
+
+    if args.dump_stats:
+        outpath = dest_path.joinpath("stats.json")
+        anvill_stats.save_json(outpath)
 
     if args.slack_notify:
         slack_msg = Slack(msg_hook)
