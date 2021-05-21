@@ -1,4 +1,3 @@
-from re import I
 import sys
 from threading import Lock
 import json
