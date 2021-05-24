@@ -59,7 +59,11 @@ class AnvillCmd(ToolCmd):
         log.debug(f"Making dir: {pth}")
         os.makedirs(pth, exist_ok=True)
 
-        self.stats.add_stat(f"output.{out_path_name}", str(self.infile))
+        out_key = f"output.{out_path_name}"
+        if self.stats.should_ignore(str(self.infile)):
+            out_key = "outputignore"
+
+        self.stats.add_stat(out_key, str(self.infile))
 
         input_name = pth.joinpath("input.elf")
         shutil.copyfile(self.infile, input_name)
@@ -172,7 +176,16 @@ if __name__ == "__main__":
         action="store_true",
         help="Output a stats.json in output directory with run statistics")
 
+    parser.add_argument(
+        "--test-options",
+        default=None,
+        help="A JSON file specifying tests to ignore or expect to fail")
+
     args = parser.parse_args()
+
+    if args.test_options and not os.path.exists(args.test_options):
+        sys.stderr.write(f"Test options file [{args.test_options}] was not found\n")
+        sys.exit(1)
 
     test_anvill_args = args.anvill_python.split()
     test_anvill_args.append("-h")
@@ -208,6 +221,11 @@ if __name__ == "__main__":
     max_items = len(sources)
 
     anvill_stats = Stats()
+    # load test to ignore
+    if args.test_options:
+        with open(args.test_options, "r") as rf:
+            anvill_stats.load_rules(rf)
+
     anvill_stats.set_stat("start_time", str(datetime.now()))
 
     apply_anvill = partial(run_anvill, args.anvill_python, dest_path, args.only_fails, source_path, anvill_stats)

@@ -7,14 +7,29 @@ class Stats:
     def __init__(self):
         self.lock = Lock()
         self.stats = {}
+        self.rules = {}
 
     def load_json(self, fil):
         with self.lock:
             self.stats = json.load(fil)
 
+    def load_rules(self, rules_file):
+        with self.lock:
+            self.rules = json.load(rules_file)
+
     def save_json(self, filepath):
         with open(filepath, "w") as fo:
             json.dump(self.stats, fo, indent=4, sort_keys=True)
+
+    def should_ignore(self, filepath):
+        # remove ignored items from failure
+        ignored_items = self.rules.get("tests.ignore", [])
+        # check if ignored
+        for i in ignored_items:
+            if i in filepath:
+                return True
+
+        return False
 
     def print_fails(self, fail_count=5, output=None):
         if output is None:
@@ -37,10 +52,15 @@ class Stats:
             k = k.replace("output.", "")
             output.write(f"`{k}`: `{len(v)}` failures\n")
 
+        ignored_outputs = self.stats.get("outputignore", [])
+        if ignored_outputs:
+            output.write(f"Ignored {len(ignored_outputs)} tests\n")
+
     def get_fail_count(self):
         success_runs = len(self.stats.get("output.success", []))
         program_runs = self.stats.get("program_runs", 0)
-        return program_runs - success_runs
+        ignored_outputs = len(self.stats.get("outputignore", []))
+        return (program_runs - ignored_outputs) - success_runs
 
     def print_stats(self, output=None):
         # emit start/end time
