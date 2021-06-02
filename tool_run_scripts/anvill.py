@@ -25,10 +25,12 @@ log.setLevel(logging.INFO)
 
 
 MYDIR = path.dirname(path.abspath(__file__))
+MSG_HOOK = ""
+VERSION = ""
 
 # given some input bitocode, run it through anvill record outputs
 
-class AnvillCmd(ToolCmd):
+class AnvillPythonCmd(ToolCmd):
 
     def make_tool_cmd(self):
         f = self.infile.stem
@@ -93,12 +95,93 @@ class AnvillCmd(ToolCmd):
             reprofile.write(" ".join(self.cmd))
             reprofile.write("\n")
 
-def run_anvill(anvill, output_dir, failonly, source_path, stats, input_and_idx):
+class AnvillDecompileCmd(ToolCmd):
+
+    def make_tool_cmd(self):
+        f = self.infile.stem
+        bcfile = f"{self.index}-{f}.bc"
+        self.tmpout = self.outdir.joinpath("work").joinpath(bcfile)
+
+        #anvill-decompile-json-11.0 -spec <json file> -bc_out <bc_file>
+        log.debug(f"Setting tmpout to: {self.tmpout}")
+        args = self.tool.split()
+        args.extend([
+            "-spec",
+            str(self.infile),
+            "-bc_out",
+            str(self.tmpout),
+            "-logtostderr",
+        ])
+        return args
+
+    def save(self):
+        if self.rc is None:
+            raise RuntimeError("Return code never set")
+
+        out_path_name = self.get_output_path()
+        pth = self.outdir.joinpath(out_path_name)
+        pth = pth.joinpath(self.infile.relative_to(self.source_base))
+
+        log.debug(f"Making dir: {pth}")
+        os.makedirs(pth, exist_ok=True)
+
+        out_key = f"output.{out_path_name}"
+        if self.stats.should_ignore(str(self.infile)):
+            out_key = "outputignore"
+
+        self.stats.add_stat(out_key, str(self.infile))
+
+        input_name = pth.joinpath("input.json")
+        shutil.copyfile(self.infile, input_name)
+
+        if self.rc == 0:
+            output_name = pth.joinpath("output.bc")
+            log.debug(f"Copying {self.tmpout} to {output_name}")
+            shutil.copyfile(self.tmpout, output_name)
+
+        dumpout = pth.joinpath("stdout")
+        with open(dumpout, "w") as out:
+            if type(self.out) is bytes:
+                out.buffer.write(self.out)
+            else:
+                out.write(str(self.out))
+
+        dumperr = pth.joinpath("stderr")
+        with open(dumperr, "w") as err:
+            if type(self.err) is bytes:
+                err.buffer.write(self.err)
+            else:
+                err.write(str(self.err))
+
+        repro = pth.joinpath("repro.sh")
+        with open(repro, 'w') as reprofile:
+            reprofile.write("#!/bin/sh\n")
+            reprofile.write(" ".join(self.cmd))
+            reprofile.write("\n")
+
+def run_anvill_python(anvill, output_dir, failonly, source_path, stats, input_and_idx):
     idx, input_file = input_and_idx
-    cmd = AnvillCmd(anvill, input_file, output_dir, source_path, idx, stats)
+    cmd = AnvillPythonCmd(anvill, input_file, output_dir, source_path, idx, stats)
 
     retcode = cmd.run()
     log.debug(f"Anvill run returned {retcode}")
+
+    if not failonly:
+        cmd.save()
+    elif failonly and retcode != 0:
+        log.debug("Saving anvill failure case")
+        cmd.save()
+    else:
+        log.debug("Successful anvill invocation not saved due to --only-fails=True")
+
+    return cmd
+
+def run_anvill_decompile(anvill, output_dir, failonly, source_path, stats, input_and_idx):
+    idx, input_file = input_and_idx
+    cmd = AnvillDecompileCmd(anvill, input_file, output_dir, source_path, idx, stats)
+
+    retcode = cmd.run()
+    log.debug(f"Anvill Decompile run returned {retcode}")
 
     if not failonly:
         cmd.save()
@@ -125,6 +208,98 @@ def get_anvill_version(cmd):
 
     return rt.stdout.decode("utf-8")
 
+
+def anvill_python_main(args, source_path, dest_path):
+    num_cpus = os.cpu_count()
+    anvill_stats = Stats()
+
+    if args.test_options:
+        with open(args.test_options, "r") as rf:
+            anvill_stats.load_rules(rf)
+
+    # get all the bitcode
+    log.info(f"Listing files in {str(source_path)}")
+    sources = list(source_path.rglob("*.elf"))
+    log.info(f"Found {len(sources)} ELF files")
+
+    # load test to ignore
+    anvill_stats.set_stat("start_time", str(datetime.now()))
+
+    max_items_python = len(sources)
+
+    # workspace for anvill-python
+    apply_anvill_python = partial(run_anvill_python, args.anvill_python, dest_path, args.only_fails, source_path, anvill_stats)
+
+    with ThreadPool(num_cpus) as p:
+        with tqdm(total=max_items_python) as pbar:
+            for _ in p.imap_unordered(apply_anvill_python, enumerate(sources)):
+                pbar.update()
+
+    anvill_stats.set_stat("end_time", str(datetime.now()))
+
+    if args.dump_stats:
+        outpath = dest_path.joinpath("stats.json")
+        anvill_stats.save_json(outpath)
+
+    if args.slack_notify:
+        dump_via_slack(args, anvill_stats)
+
+def anvill_decomp_main(args, source_path, dest_path):
+
+    sources_decompile = list(source_path.rglob("*.json"))
+    if sources_decompile:
+        workdir_decompile = str(dest_path.joinpath("work"))
+        log.debug(f"Making work dir [{workdir_decompile}]")
+        os.makedirs(workdir_decompile, exist_ok=True)
+    log.info(f"Found {len(sources_decompile)} JSON specs")
+
+    num_cpus = os.cpu_count()
+    anvill_stats = Stats()
+
+    if args.test_options:
+        with open(args.test_options, "r") as rf:
+            anvill_stats.load_rules(rf)
+
+    # load test to ignore
+    anvill_stats.set_stat("start_time", str(datetime.now()))
+
+    max_items_decompile = len(sources_decompile)
+
+    apply_anvill_decomp = partial(run_anvill_decompile, args.anvill_decompile, dest_path, args.only_fails, source_path_decompile, anvill_stats)
+
+    with ThreadPool(num_cpus) as p:
+        with tqdm(total=max_items_decompile) as pbar:
+            for _ in p.imap_unordered(apply_anvill_decomp, enumerate(sources_decompile)):
+                pbar.update()
+
+    anvill_stats.set_stat("end_time", str(datetime.now()))
+
+    if args.dump_stats:
+        outpath = dest_path.joinpath("stats.json")
+        anvill_stats.save_json(outpath)
+
+    if args.slack_notify:
+        dump_via_slack(args, anvill_stats)
+
+def dump_via_slack(args, stats):
+    slack_msg = Slack(MSG_HOOK)
+    slack_msg.add_header(f"{args.run_name}")
+    slack_msg.add_block(f"Anvill Version: ```{VERSION}```")
+    slack_msg.add_divider()
+
+    with StringIO() as stat_msg:
+        stats.print_stats(stat_msg)
+        slack_msg.add_block(stat_msg.getvalue())
+
+    slack_msg.add_divider()
+
+    with StringIO() as fail_msg:
+        max_num_fails = 10
+        slack_msg.add_block(f"Top {max_num_fails}:")
+        stats.print_fails(fail_count=max_num_fails, output=fail_msg)
+        slack_msg.add_block(fail_msg.getvalue())
+    
+    slack_msg.post()
 
 if __name__ == "__main__":
 
@@ -195,70 +370,27 @@ if __name__ == "__main__":
         sys.exit(1)
 
     if args.slack_notify:
-        msg_hook = os.environ.get("SLACK_HOOK", None)
+        MSG_HOOK = os.environ.get("SLACK_HOOK", None)
 
-        if not msg_hook:
+        if not MSG_HOOK:
             sys.stderr.write("Invalid webhook in SLACK_HOOK env var\n")
             sys.exit(1)
 
-    version = get_anvill_version(args.anvill_decompile)
-    log.info(f"Running against Anvill:\n{version}")
+    VERSION = get_anvill_version(args.anvill_decompile)
+    log.info(f"Running against Anvill:\n{VERSION}")
 
     source_path = Path(args.input_dir)
     dest_path = Path(args.output_dir)
-    # get all the bitcode
-    log.info(f"Listing files in {str(source_path)}")
-    sources = list(source_path.rglob("*.elf"))
-    log.info(f"Found {len(sources)} ELF files")
 
-    if sources:
-        workdir = str(dest_path.joinpath("work"))
-        log.debug(f"Making work dir [{workdir}]")
-        os.makedirs(workdir, exist_ok=True)
+    python_dest_path = dest_path.joinpath("python")
+    # make workdir and subdirs
+    os.makedirs(python_dest_path.joinpath("work"), exist_ok=True)
 
-    
-    num_cpus = os.cpu_count()
-    max_items = len(sources)
+    anvill_python_main(args, source_path, python_dest_path)
 
-    anvill_stats = Stats()
-    # load test to ignore
-    if args.test_options:
-        with open(args.test_options, "r") as rf:
-            anvill_stats.load_rules(rf)
+    source_path_decompile = python_dest_path.joinpath("success")
+    dest_path_decompile = dest_path.joinpath("decompile")
+    # make workdir and subdirs
+    os.makedirs(dest_path_decompile.joinpath("work"), exist_ok=True)
 
-    anvill_stats.set_stat("start_time", str(datetime.now()))
-
-    apply_anvill = partial(run_anvill, args.anvill_python, dest_path, args.only_fails, source_path, anvill_stats)
-
-
-    #with Pool(processes=num_cpus) as p:
-    with ThreadPool(num_cpus) as p:
-        with tqdm(total=max_items) as pbar:
-            for _ in p.imap_unordered(apply_anvill, enumerate(sources)):
-                pbar.update()
-
-    anvill_stats.set_stat("end_time", str(datetime.now()))
-
-    if args.dump_stats:
-        outpath = dest_path.joinpath("stats.json")
-        anvill_stats.save_json(outpath)
-
-    if args.slack_notify:
-        slack_msg = Slack(msg_hook)
-        slack_msg.add_header(f"{args.run_name}")
-        slack_msg.add_block(f"Anvill Version: ```{version}```")
-        slack_msg.add_divider()
-
-        with StringIO() as stat_msg:
-            anvill_stats.print_stats(stat_msg)
-            slack_msg.add_block(stat_msg.getvalue())
-
-        slack_msg.add_divider()
-
-        with StringIO() as fail_msg:
-            max_num_fails = 10
-            slack_msg.add_block(f"Top {max_num_fails}:")
-            anvill_stats.print_fails(fail_count=max_num_fails, output=fail_msg)
-            slack_msg.add_block(fail_msg.getvalue())
-        
-        slack_msg.post()
+    anvill_decomp_main(args, source_path_decompile, dest_path_decompile)
