@@ -297,7 +297,11 @@ def dump_via_slack(args, stats):
         max_num_fails = 10
         slack_msg.add_block(f"Top {max_num_fails}:")
         stats.print_fails(fail_count=max_num_fails, output=fail_msg)
-        slack_msg.add_block(fail_msg.getvalue())
+        fail_output = fail_msg.getvalue()
+        if fail_output:
+            slack_msg.add_block(fail_output)
+        else:
+            slack_msg.add_block("<None>")
     
     slack_msg.post()
 

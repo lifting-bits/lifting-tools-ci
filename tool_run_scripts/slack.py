@@ -43,9 +43,11 @@ class Slack:
         msg_d = {
             'blocks': self.blocks
         }
+        # for debugging
+        #sys.stdout.write(json.dumps(msg_d, indent=4, sort_keys=True))
         resp = requests.post(
             self.hook, data = json.dumps(msg_d),
             headers = {'Content-Type': 'application/json'})
 
         if resp.status_code != 200:
-            raise RuntimeError(f"Could not post slack messsage: {str(resp)}")
+            raise RuntimeError(f"Could not post slack messsage: [{resp.status_code}]: {resp.text}")
