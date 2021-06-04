@@ -10,6 +10,7 @@ log.setLevel(logging.INFO)
 
 FILE_NAME_RE = re.compile("([^/\s]+\.[^/\s]+:\d+)")
 PYTHON_ERROR_RE = re.compile('([^/\s]+\.py)", line (\d+)')
+ASAN_ERROR_RE = re.compile('AddressSanitizer: [a-zA-Z\-]+ .*/([^:]+:[\d]+)')
 
 class ToolCmd:
     def __init__(self, tool, infile, outdir, source_base, index, stats):
@@ -33,6 +34,15 @@ class ToolCmd:
     def make_tool_cmd(self):
         raise RuntimeError("Please override make_tool_cmd")
     
+    def asan_traceback(self, msg):
+        if not msg:
+            return None
+        for ln in reversed(msg.splitlines()):
+            fname = ASAN_ERROR_RE.search(ln)
+            if fname:
+                return fname.group(1)
+        return None
+
     def python_traceback(self, msg):
         if not msg:
             return None
@@ -40,7 +50,7 @@ class ToolCmd:
         for ln in reversed(msg.splitlines()):
             fname = PYTHON_ERROR_RE.search(ln)
             if fname:
-                return f"{fname.group(1)}:{fname.group(2)}"
+                return "{fname.group(1)}:{fname.group(2)}"
         
         return None
 
@@ -60,9 +70,11 @@ class ToolCmd:
         # Next, check for more generic filename matches in the whole message
         # example:
         # UNREACHABLE executed at /__w/cxx-common/cxx-common/vcpkg/buildtrees/llvm-11/src/org-11.0.0-8ebd641fb6.clean/llvm/lib/Support/APFloat.cpp:154!
-        fname = FILE_NAME_RE.search(msg)
-        if fname:
-            return fname.group(1)
+        # start searching bottom up
+        for ln in reversed(msg.splitlines()):
+            fname = FILE_NAME_RE.search(ln)
+            if fname:
+                return fname.group(1)
         
         # default to normal handler
         return None
@@ -77,12 +89,16 @@ class ToolCmd:
             -signal.SIGABRT: "sigabrt",
             -signal.SIGILL: "sigill",
             0: "success",
-            1: "PythonAssertion",
+            1: "Assertion",
         }
 
         default_location = rc_to_path.get(self.rc, f"unknown_{self.rc}")
         if self.rc == 1:
-            return self.python_traceback(self.err) or default_location
+            # ASAN or Python Assertion
+            if "AddressSanitizer" in self.err:
+                return self.asan_traceback(self.err) or default_location
+            else:
+                return self.python_traceback(self.err) or default_location
         elif self.rc == -signal.SIGABRT:
             return self.c_abort(self.err) or default_location
         else:
@@ -110,7 +126,7 @@ class ToolCmd:
                 check=True,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                timeout=120, # two minutes should be more than enough
+                timeout=300, # five minutes should be more than enough
             )
         except OSError as oe:
             log.debug("Tool invocation hit OS error")
