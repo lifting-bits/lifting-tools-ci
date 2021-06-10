@@ -50,7 +50,7 @@ class ToolCmd:
         for ln in reversed(msg.splitlines()):
             fname = PYTHON_ERROR_RE.search(ln)
             if fname:
-                return "{fname.group(1)}:{fname.group(2)}"
+                return f"{fname.group(1)}:{fname.group(2)}"
         
         return None
 
