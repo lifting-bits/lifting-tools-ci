@@ -260,7 +260,6 @@ def anvill_decomp_main(args, source_path, dest_path):
         with open(args.test_options, "r") as rf:
             anvill_stats.load_rules(rf)
 
-    # load test to ignore
     anvill_stats.set_stat("start_time", str(datetime.now()))
 
     max_items_decompile = len(sources_decompile)
