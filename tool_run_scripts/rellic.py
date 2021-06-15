@@ -86,13 +86,18 @@ class RellicCmd(ToolCmd):
         pth = self.outdir.joinpath(out_path_name)
         pth = pth.joinpath(self.infile.relative_to(self.source_base))
 
-        self.stats.add_stat(f"output.{out_path_name}", str(self.infile))
+        out_key = f"output.{out_path_name}"
+        if self.stats.should_ignore(str(self.infile)):
+            out_key = "outputignore"
+
+        self.stats.add_stat(out_key, str(self.infile))
 
         log.debug(f"Making dir: {pth}")
         os.makedirs(pth, exist_ok=True)
 
         input_name = pth.joinpath("input.bc")
         shutil.copyfile(self.infile, input_name)
+
 
         if self.rc == 0:
             output_name = pth.joinpath("output.c")
@@ -199,11 +204,19 @@ if __name__ == "__main__":
         action="store_true",
         help="Output a stats.json in output directory with run statistics")
 
+    parser.add_argument(
+        "--test-options",
+        default=None,
+        help="A JSON file specifying tests to ignore or expect to fail")
 
     args = parser.parse_args()
 
     if shutil.which(args.rellic) is None:
         sys.stderr.write(f"Could not find rellic command: {args.rellic}\n")
+        sys.exit(1)
+
+    if args.test_options and not os.path.exists(args.test_options):
+        sys.stderr.write(f"Test options file [{args.test_options}] was not found\n")
         sys.exit(1)
 
     if args.slack_notify:
@@ -232,6 +245,11 @@ if __name__ == "__main__":
     num_cpus = os.cpu_count()
     max_items = len(sources)
     rellic_stats = Stats()
+
+    if args.test_options:
+        with open(args.test_options, "r") as rf:
+            rellic_stats.load_rules(rf)
+
     rellic_stats.set_stat("start_time", str(datetime.now()))
     apply_rellic = partial(run_rellic, args.rellic, dest_path, args.only_fails, source_path, rellic_stats)
 
