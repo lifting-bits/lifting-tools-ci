@@ -52,9 +52,23 @@ class Stats:
             k = k.replace("output.", "")
             output.write(f"`{k}`: `{len(v)}` failures\n")
 
-        ignored_outputs = self.stats.get("outputignore", [])
-        if ignored_outputs:
-            output.write(f"Ignored {len(ignored_outputs)} tests\n")
+
+        ign_outputs = {"outputignore_success": None, "outputignore_fail": None}
+        ign_count = 0
+        for ign_type in ign_outputs.keys():
+            ign_entry = self.stats.get(ign_type, [])
+            ign_count += len(ign_entry)
+            ign_outputs[ign_type] = (len(ign_entry), ign_entry)
+
+        if ign_count > 0:
+            output.write(f"Ignored {len(ign_count)} tests.\n")
+            ign_pass_count, ign_pass_list = ign_outputs["outputignore_success"]
+            if ign_pass_count > 0:
+                output.write(f"    {ign_pass_count} ignored tests are passing! They are:\n")
+                for ign_pass_test in ign_pass_list:
+                    output.write(f"    {ign_pass_test}\n")
+            else:
+                output.write("    All ignored tests failed\n")
 
     def get_fail_count(self):
         success_runs = len(self.stats.get("output.success", []))

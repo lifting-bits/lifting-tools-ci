@@ -63,7 +63,10 @@ class AnvillPythonCmd(ToolCmd):
 
         out_key = f"output.{out_path_name}"
         if self.stats.should_ignore(str(self.infile)):
-            out_key = "outputignore"
+            if self.rc == 0:
+                out_key = "outputignore_success"
+            else:
+                out_key = "outputignore_fail"
 
         self.stats.add_stat(out_key, str(self.infile))
 
@@ -127,7 +130,10 @@ class AnvillDecompileCmd(ToolCmd):
 
         out_key = f"output.{out_path_name}"
         if self.stats.should_ignore(str(self.infile)):
-            out_key = "outputignore"
+            if self.rc == 0:
+                out_key = "outputignore_success"
+            else:
+                out_key = "outputignore_fail"
 
         self.stats.add_stat(out_key, str(self.infile))
 
