@@ -56,6 +56,7 @@ class Stats:
                     output.write(f"    {test_fail}\n")
 
 
+
         ign_outputs = {"outputignore_success": None, "outputignore_fail": None}
         ign_count = 0
         for ign_type in ign_outputs.keys():
@@ -73,6 +74,7 @@ class Stats:
                         output.write(f"    {ign_pass_test}\n")
                 else:
                     output.write("    [set verbose=True to see test list]\n")
+
             else:
                 output.write("    All ignored tests failed\n")
 
