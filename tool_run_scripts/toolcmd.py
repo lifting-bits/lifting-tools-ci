@@ -118,7 +118,9 @@ class ToolCmd:
     def run(self):
 
         try:
-            log.debug(f"Running [{self.cmd}]")
+            # default to 5 min timeout
+            timeout_seconds = int(self.stats.rules.get("timeout.seconds", "300"))
+            log.debug(f"Running [{self.cmd}] with a timeout of {timeout_seconds} sec")
             self.stats.inc_stat("program_runs")
             tool_run = subprocess.run(
                 args=self.cmd,
@@ -126,7 +128,7 @@ class ToolCmd:
                 check=True,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                timeout=300, # five minutes should be more than enough
+                timeout=timeout_seconds,
             )
         except OSError as oe:
             log.debug("Tool invocation hit OS error")
