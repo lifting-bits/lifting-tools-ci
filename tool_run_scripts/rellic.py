@@ -88,7 +88,10 @@ class RellicCmd(ToolCmd):
 
         out_key = f"output.{out_path_name}"
         if self.stats.should_ignore(str(self.infile)):
-            out_key = "outputignore"
+            if self.rc == 0:
+                out_key = "outputignore_success"
+            else:
+                out_key = "outputignore_fail"
 
         self.stats.add_stat(out_key, str(self.infile))
 
@@ -282,7 +285,9 @@ if __name__ == "__main__":
 
         with StringIO() as fail_msg:
             slack_msg.add_block(f"Top {max_num_fails}:")
-            rellic_stats.print_fails(fail_count=max_num_fails, output=fail_msg)
+            # verbose is set to False here to avoid slack messages
+            # that are too long for Slack
+            rellic_stats.print_fails(fail_count=max_num_fails, output=fail_msg, verbose=False)
             slack_msg.add_block(fail_msg.getvalue())
         
         slack_msg.post()
