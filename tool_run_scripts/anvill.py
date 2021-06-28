@@ -301,7 +301,8 @@ def dump_via_slack(args, stats):
     with StringIO() as fail_msg:
         max_num_fails = 10
         slack_msg.add_block(f"Top {max_num_fails}:")
-        stats.print_fails(fail_count=max_num_fails, output=fail_msg)
+        # verbose is set to False to prevent overly long Slack messages
+        stats.print_fails(fail_count=max_num_fails, output=fail_msg, verbose=False)
         fail_output = fail_msg.getvalue()
         if fail_output:
             slack_msg.add_block(fail_output)
