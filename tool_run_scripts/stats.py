@@ -31,7 +31,7 @@ class Stats:
 
         return False
 
-    def print_fails(self, fail_count=5, output=None):
+    def print_fails(self, fail_count=5, output=None, verbose=True):
         if output is None:
             output = sys.stderr
 
@@ -51,9 +51,10 @@ class Stats:
         for k, v in top_items[:fail_count]:
             k = k.replace("output.", "")
             output.write(f"`{k}`: `{len(v)}` failures\n")
-            #TODO(artem): Maybe gate this via a verbose flag?
-            for test_fail in v:
-                output.write(f"    {test_fail}\n")
+            if verbose:
+                for test_fail in v:
+                    output.write(f"    {test_fail}\n")
+
 
 
         ign_outputs = {"outputignore_success": None, "outputignore_fail": None}
@@ -68,8 +69,12 @@ class Stats:
             ign_pass_count, ign_pass_list = ign_outputs["outputignore_success"]
             if ign_pass_count > 0:
                 output.write(f"    {ign_pass_count} ignored tests are passing! They are:\n")
-                for ign_pass_test in ign_pass_list:
-                    output.write(f"    {ign_pass_test}\n")
+                if verbose:
+                    for ign_pass_test in ign_pass_list:
+                        output.write(f"    {ign_pass_test}\n")
+                else:
+                    output.write("    [set verbose=True to see test list]\n")
+
             else:
                 output.write("    All ignored tests failed\n")
 
