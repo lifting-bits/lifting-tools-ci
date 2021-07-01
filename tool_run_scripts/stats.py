@@ -81,7 +81,8 @@ class Stats:
     def get_fail_count(self):
         success_runs = len(self.stats.get("output.success", []))
         program_runs = self.stats.get("program_runs", 0)
-        ignored_outputs = len(self.stats.get("outputignore", []))
+        ignored_outputs = len(self.stats.get("outputignore_success", []))
+        ignored_outputs += len(self.stats.get("outputignore_fail", []))
         return (program_runs - ignored_outputs) - success_runs
 
     def print_stats(self, output=None):
