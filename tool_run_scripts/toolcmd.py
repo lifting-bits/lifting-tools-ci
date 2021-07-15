@@ -11,6 +11,7 @@ log.setLevel(logging.INFO)
 FILE_NAME_RE = re.compile("([^/\s]+\.[^/\s]+:\d+)")
 PYTHON_ERROR_RE = re.compile('([^/\s]+\.py)", line (\d+)')
 ASAN_ERROR_RE = re.compile('AddressSanitizer: [a-zA-Z\-]+ .*/([^:]+:[\d]+)')
+CLANG_ERROR_RE = re.compile("error: ([\w']+) *([\w']*) *([\w']+) *([\w']+)")
 
 class ToolCmd:
     def __init__(self, tool, infile, outdir, source_base, index, stats):
@@ -34,6 +35,15 @@ class ToolCmd:
     def make_tool_cmd(self):
         raise RuntimeError("Please override make_tool_cmd")
     
+    def clang_traceback(self, msg):
+        if not msg:
+            return None
+        for ln in reversed(msg.splitlines()):
+            fname = CLANG_ERROR_RE.search(ln)
+            if fname:
+                return fname.group(0).replace("error: ", "").replace("'", "").replace(' ', '_')
+        return None
+
     def asan_traceback(self, msg):
         if not msg:
             return None
@@ -97,6 +107,8 @@ class ToolCmd:
             # ASAN or Python Assertion
             if "AddressSanitizer" in self.err:
                 return self.asan_traceback(self.err) or default_location
+            elif "errors generated." in self.err or "error generated." in self.err:
+                return self.clang_traceback(self.err) or default_location
             else:
                 return self.python_traceback(self.err) or default_location
         elif self.rc == -signal.SIGABRT:
