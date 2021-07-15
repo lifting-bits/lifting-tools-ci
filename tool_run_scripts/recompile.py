@@ -26,34 +26,6 @@ log.setLevel(logging.INFO)
 MYDIR = path.dirname(path.abspath(__file__))
 
 
-# Output dir will have:
-# output_dir/
-#  success/
-#    testnumber.arch.original_input_file/
-#      bitcode.bc
-#      output.c
-#      stdout
-#      stderr
-#  segv/
-#   testnumber.arch.original_input_file/
-#      bitcode.bc
-#      stdout
-#      stderr
-#      repro.sh
-#  abort/
-#   testnumber.arch.original_input_file/
-#      bitcode.bc
-#      stdout
-#      stderr
-#      repro.sh
-#  other/
-#   testnumber.arch.original_input_file/
-#      bitcode.bc
-#      stdout
-#      stderr
-#      repro.sh
-#
-
 def get_clang_version(cmd):
     try:
         rt =  subprocess.run([cmd, "--version"], timeout=30, capture_output=True)
@@ -227,11 +199,11 @@ if __name__ == "__main__":
 
     source_path = Path(args.input_dir)
     dest_path = Path(args.output_dir)
-    # get all the bitcode
+    # get all the C 
     log.info(f"Listing files in {str(source_path)}")
     sources = list(source_path.rglob("*.c"))
     sources = list(filter(lambda x: os.path.isfile(x), sources))
-    log.info(f"Found {len(sources)} bitcode files")
+    log.info(f"Found {len(sources)} C files")
 
     if sources:
         workdir = str(dest_path.joinpath("work"))
