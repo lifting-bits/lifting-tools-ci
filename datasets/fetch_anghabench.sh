@@ -85,7 +85,7 @@ if [[ "${FETCH_BITCODE}" = "yes" ]]
 then
   for arch in "${ARCHES[@]}"
   do
-    bcfile=${RUN_SIZE}.bitcode.${CLANG}.${arch}.tar.xz
+    bcfile=${RUN_SIZE}.bitcode.clang-${CLANG}.${arch}.tar.xz
     curl -LO https://anghabench-files-public.nyc3.digitaloceanspaces.com/${CLANG}/${bcfile}
   done
 fi
@@ -94,7 +94,7 @@ if [[ "${FETCH_BINARIES}" = "yes" ]]
 then
   for arch in "${ARCHES[@]}"
   do
-    bcfile=${RUN_SIZE}.binaries.${CLANG}.${arch}.tar.xz
+    bcfile=${RUN_SIZE}.binaries.clang-${CLANG}.${arch}.tar.xz
     curl -LO https://anghabench-files-public.nyc3.digitaloceanspaces.com/${CLANG}/${bcfile}
   done
 fi
