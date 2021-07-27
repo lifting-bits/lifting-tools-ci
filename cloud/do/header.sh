@@ -20,6 +20,8 @@ trap exit_hook EXIT
 # pretty much required
 export DEBIAN_FRONTEND=noninteractive
 export SLACK_HOOK=__SLACK_HOOK__
+export AWS_ACCESS_KEY_ID="__AWS_ACCESS_KEY_ID__"
+export AWS_SECRET_ACCESS_KEY="__AWS_SECRET_ACCESS_KEY__"
 export RUN_NAME="__RUN_NAME__"
 export CI_BRANCH=__CI_BRANCH__
 export HOME=/root
