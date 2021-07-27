@@ -73,9 +73,17 @@ if __name__ == "__main__":
 
 
     VARS_TO_FIX = {
+        # DO Spaces token
+        "AWS_ACCESS_KEY_ID": os.environ.get("AWS_ACCESS_KEY_ID", ""),
+        # DO Spaces token password
+        "AWS_SECRET_ACCESS_KEY": os.environ.get("AWS_SECRET_ACCESS_KEY", ""),
+        # DO compute token
         "DO_TOKEN": args.token,
+        # Slack hook to msg slack
         "SLACK_HOOK": os.environ["SLACK_HOOK"],
+        # Binja license key
         "BINJA_DECODE_KEY": os.environ.get("BINJA_DECODE_KEY", ""),
+        # Name of this CI run
         "RUN_NAME": args.name,
     }
 
