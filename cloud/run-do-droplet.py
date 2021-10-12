@@ -43,7 +43,8 @@ if __name__ == "__main__":
 
     parser.add_argument(
         "--instance",
-        default="c-32",
+        default="c2-32vcpu-64gb",
+        # default="c-32",
         help="Instance type to create"
     )
 
