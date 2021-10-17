@@ -392,6 +392,12 @@ if __name__ == "__main__":
             sys.stderr.write("Invalid webhook in SLACK_HOOK env var\n")
             sys.exit(1)
 
+        slack_msg = Slack(MSG_HOOK)
+        slack_msg.add_header(f"{args.run_name}")
+        slack_msg.add_block(f"Anvill Version: TESTING SLACKOP ")
+        slack_msg.post()
+
+
     VERSION = get_anvill_version(args.anvill_decompile)
     log.info(f"Running against Anvill:\n{VERSION}")
 
