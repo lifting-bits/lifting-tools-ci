@@ -287,6 +287,10 @@ def anvill_decomp_main(args, source_path, dest_path):
         dump_via_slack(args, anvill_stats)
 
 def dump_via_slack(args, stats):
+    if not MSG_HOOK:
+        sys.stderr.write("Invalid webhook in SLACK_HOOK env var\n")
+        sys.exit(1)
+
     slack_msg = Slack(MSG_HOOK)
     slack_msg.add_header(f"{args.run_name}")
     slack_msg.add_block(f"Anvill Version: ```{VERSION}```")
