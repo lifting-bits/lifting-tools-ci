@@ -16,7 +16,9 @@ from stats import Stats
 from slack import Slack
 from io import StringIO
 from datetime import datetime
-
+import json
+from collections import Counter
+from threading import Lock
 
 log = logging.getLogger("anvill_test_suite")
 log.addHandler(logging.StreamHandler())
@@ -36,7 +38,6 @@ class AnvillPythonCmd(ToolCmd):
     def make_tool_cmd(self):
         f = self.infile.stem
         jsonfile = f"{self.index}-{f}.json"
-        statfile = f"{self.index}-{f}-stats.json"
         self.tmpout = self.outdir.joinpath("work").joinpath(jsonfile)
 
         # python3 -m anvill --bin_in foo.elf --spec_out foo.json
@@ -47,8 +48,6 @@ class AnvillPythonCmd(ToolCmd):
             str(self.infile),
             "--spec_out",
             str(self.tmpout),
-            "--stats_out",
-            statfile,
             "--log_file",
             "/dev/stderr",
         ])
@@ -103,12 +102,35 @@ class AnvillPythonCmd(ToolCmd):
             reprofile.write("\n")
 
 
+class DecompileStats:
+    def __init__(self) -> None:
+        self.lock = Lock()
+        self.stat_dict = Counter()
+
+    def add_stats(self, file_path):
+        with self.lock:
+            with open(file_path, 'r') as f:
+                nd = json.load(f)
+                self.stat_dict.update(nd)
+
+    def dump(self, outpath):
+        with self.lock:
+            with open(outpath, 'w') as f:
+                json.dump(self.stat_dict, f)
+
+
 class AnvillDecompileCmd(ToolCmd):
+
+    def __init__(self, tool, infile, outdir, source_base, index, stats, decomp_stats):
+        super().__init__(tool, infile, outdir, source_base, index, stats)
+        self.decomp_stats = decomp_stats
 
     def make_tool_cmd(self):
         f = self.infile.stem
         bcfile = f"{self.index}-{f}.bc"
-        self.tmpout = self.outdir.joinpath("work").joinpath(bcfile)
+        self.work_dir = self.outdir.joinpath("work")
+        self.stats_file = self.work_dir.joinpath(f"{self.index}-{f}.stats")
+        self.tmpout = self.work_dir.joinpath(bcfile)
 
         # anvill-decompile-json-11.0 -spec <json file> -bc_out <bc_file>
         log.debug(f"Setting tmpout to: {self.tmpout}")
@@ -118,6 +140,8 @@ class AnvillDecompileCmd(ToolCmd):
             str(self.infile),
             "-bc_out",
             str(self.tmpout),
+            "-stats_out",
+            str(self.stats_file),
             "-logtostderr",
         ])
         return args
@@ -149,6 +173,8 @@ class AnvillDecompileCmd(ToolCmd):
             output_name = pth.joinpath("output.bc")
             log.debug(f"Copying {self.tmpout} to {output_name}")
             shutil.copyfile(self.tmpout, output_name)
+            log.debug(f"Aggregating stats file {self.stats_file}")
+            self.decomp_stats.add_stats(self.stats_file)
 
         dumpout = pth.joinpath("stdout")
         with open(dumpout, "w") as out:
@@ -190,10 +216,10 @@ def run_anvill_python(anvill, output_dir, failonly, source_path, stats, input_an
     return cmd
 
 
-def run_anvill_decompile(anvill, output_dir, failonly, source_path, stats, input_and_idx):
+def run_anvill_decompile(anvill, output_dir, failonly, source_path, stats, decomp_stats, input_and_idx):
     idx, input_file = input_and_idx
     cmd = AnvillDecompileCmd(
-        anvill, input_file, output_dir, source_path, idx, stats)
+        anvill, input_file, output_dir, source_path, idx, stats, decomp_stats)
 
     retcode = cmd.run()
     log.debug(f"Anvill Decompile run returned {retcode}")
@@ -275,6 +301,8 @@ def anvill_decomp_main(args, source_path, dest_path):
     num_cpus = os.cpu_count()
     anvill_stats = Stats()
 
+    decompilation_stats = DecompileStats()
+
     if args.test_options:
         with open(args.test_options, "r") as rf:
             anvill_stats.load_rules(rf)
@@ -284,7 +312,7 @@ def anvill_decomp_main(args, source_path, dest_path):
     max_items_decompile = len(sources_decompile)
 
     apply_anvill_decomp = partial(run_anvill_decompile, args.anvill_decompile,
-                                  dest_path, args.only_fails, source_path_decompile, anvill_stats)
+                                  dest_path, args.only_fails, source_path_decompile, anvill_stats, decompilation_stats)
 
     with ThreadPool(num_cpus) as p:
         with tqdm(total=max_items_decompile) as pbar:
@@ -292,6 +320,10 @@ def anvill_decomp_main(args, source_path, dest_path):
                 pbar.update()
 
     anvill_stats.set_stat("end_time", str(datetime.now()))
+
+    if args.dump_benchmark:
+        outpath = dest_path.joinpath("decompile_stats.json")
+        decompilation_stats.dump(outpath)
 
     if args.dump_stats:
         outpath = dest_path.joinpath("stats.json")
@@ -377,6 +409,9 @@ if __name__ == "__main__":
         default=False,
         action="store_true",
         help="Output a stats.json in output directory with run statistics")
+
+    parser.add_argument("--dump-benchmark", default=False,
+                        action="store_true", help="dump aggregated benchmark statistics")
 
     parser.add_argument(
         "--test-options",
