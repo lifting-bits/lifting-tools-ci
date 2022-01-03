@@ -226,6 +226,8 @@ def anvill_python_main(args, source_path, dest_path):
     # get all the bitcode
     log.info(f"Listing files in {str(source_path)}")
     sources = list(source_path.rglob("*.elf"))
+    # Sometimes we forget the .elf suffix
+    sources.extend(list(source_path.rglob("*.o")))
     log.info(f"Found {len(sources)} ELF files")
 
     # load test to ignore
