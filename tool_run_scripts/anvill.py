@@ -16,11 +16,13 @@ from stats import Stats
 from slack import Slack
 from io import StringIO
 from datetime import datetime
-
+import json
+from collections import Counter
+from threading import Lock
 
 log = logging.getLogger("anvill_test_suite")
 log.addHandler(logging.StreamHandler())
-#log.setLevel(logging.DEBUG)
+# log.setLevel(logging.DEBUG)
 log.setLevel(logging.INFO)
 
 
@@ -30,6 +32,7 @@ VERSION = ""
 
 # given some input bitocode, run it through anvill record outputs
 
+
 class AnvillPythonCmd(ToolCmd):
 
     def make_tool_cmd(self):
@@ -37,7 +40,7 @@ class AnvillPythonCmd(ToolCmd):
         jsonfile = f"{self.index}-{f}.json"
         self.tmpout = self.outdir.joinpath("work").joinpath(jsonfile)
 
-        #python3 -m anvill --bin_in foo.elf --spec_out foo.json 
+        # python3 -m anvill --bin_in foo.elf --spec_out foo.json
         log.debug(f"Setting tmpout to: {self.tmpout}")
         args = self.tool.split()
         args.extend([
@@ -98,14 +101,38 @@ class AnvillPythonCmd(ToolCmd):
             reprofile.write(" ".join(self.cmd))
             reprofile.write("\n")
 
+
+class DecompileStats:
+    def __init__(self) -> None:
+        self.lock = Lock()
+        self.stat_dict = Counter()
+
+    def add_stats(self, file_path):
+        with self.lock:
+            with open(file_path, 'r') as f:
+                nd = json.load(f)
+                self.stat_dict.update(nd)
+
+    def dump(self, outpath):
+        with self.lock:
+            with open(outpath, 'w') as f:
+                json.dump(self.stat_dict, f)
+
+
 class AnvillDecompileCmd(ToolCmd):
+
+    def __init__(self, tool, infile, outdir, source_base, index, stats, decomp_stats):
+        super().__init__(tool, infile, outdir, source_base, index, stats)
+        self.decomp_stats = decomp_stats
 
     def make_tool_cmd(self):
         f = self.infile.stem
         bcfile = f"{self.index}-{f}.bc"
-        self.tmpout = self.outdir.joinpath("work").joinpath(bcfile)
+        self.work_dir = self.outdir.joinpath("work")
+        self.stats_file = self.work_dir.joinpath(f"{self.index}-{f}.stats")
+        self.tmpout = self.work_dir.joinpath(bcfile)
 
-        #anvill-decompile-json-11.0 -spec <json file> -bc_out <bc_file>
+        # anvill-decompile-json-11.0 -spec <json file> -bc_out <bc_file>
         log.debug(f"Setting tmpout to: {self.tmpout}")
         args = self.tool.split()
         args.extend([
@@ -113,6 +140,8 @@ class AnvillDecompileCmd(ToolCmd):
             str(self.infile),
             "-bc_out",
             str(self.tmpout),
+            "-stats_out",
+            str(self.stats_file),
             "-logtostderr",
         ])
         return args
@@ -144,6 +173,8 @@ class AnvillDecompileCmd(ToolCmd):
             output_name = pth.joinpath("output.bc")
             log.debug(f"Copying {self.tmpout} to {output_name}")
             shutil.copyfile(self.tmpout, output_name)
+            log.debug(f"Aggregating stats file {self.stats_file}")
+            self.decomp_stats.add_stats(self.stats_file)
 
         dumpout = pth.joinpath("stdout")
         with open(dumpout, "w") as out:
@@ -165,9 +196,11 @@ class AnvillDecompileCmd(ToolCmd):
             reprofile.write(" ".join(self.cmd))
             reprofile.write("\n")
 
+
 def run_anvill_python(anvill, output_dir, failonly, source_path, stats, input_and_idx):
     idx, input_file = input_and_idx
-    cmd = AnvillPythonCmd(anvill, input_file, output_dir, source_path, idx, stats)
+    cmd = AnvillPythonCmd(anvill, input_file, output_dir,
+                          source_path, idx, stats)
 
     retcode = cmd.run()
     log.debug(f"Anvill run returned {retcode}")
@@ -182,9 +215,11 @@ def run_anvill_python(anvill, output_dir, failonly, source_path, stats, input_an
 
     return cmd
 
-def run_anvill_decompile(anvill, output_dir, failonly, source_path, stats, input_and_idx):
+
+def run_anvill_decompile(anvill, output_dir, failonly, source_path, stats, decomp_stats, input_and_idx):
     idx, input_file = input_and_idx
-    cmd = AnvillDecompileCmd(anvill, input_file, output_dir, source_path, idx, stats)
+    cmd = AnvillDecompileCmd(
+        anvill, input_file, output_dir, source_path, idx, stats, decomp_stats)
 
     retcode = cmd.run()
     log.debug(f"Anvill Decompile run returned {retcode}")
@@ -199,9 +234,11 @@ def run_anvill_decompile(anvill, output_dir, failonly, source_path, stats, input
 
     return cmd
 
+
 def get_anvill_version(cmd):
     try:
-        rt =  subprocess.run([cmd, "--version"], timeout=30, capture_output=True)
+        rt = subprocess.run([cmd, "--version"],
+                            timeout=30, capture_output=True)
     except OSError as oe:
         log.error(f"Could not get anvill version: {oe}")
         sys.exit(1)
@@ -236,7 +273,8 @@ def anvill_python_main(args, source_path, dest_path):
     max_items_python = len(sources)
 
     # workspace for anvill-python
-    apply_anvill_python = partial(run_anvill_python, args.anvill_python, dest_path, args.only_fails, source_path, anvill_stats)
+    apply_anvill_python = partial(
+        run_anvill_python, args.anvill_python, dest_path, args.only_fails, source_path, anvill_stats)
 
     with ThreadPool(num_cpus) as p:
         with tqdm(total=max_items_python) as pbar:
@@ -252,6 +290,7 @@ def anvill_python_main(args, source_path, dest_path):
     if args.slack_notify:
         dump_via_slack(args, anvill_stats)
 
+
 def anvill_decomp_main(args, source_path, dest_path):
 
     sources_decompile = list(source_path.rglob("*.json"))
@@ -264,6 +303,8 @@ def anvill_decomp_main(args, source_path, dest_path):
     num_cpus = os.cpu_count()
     anvill_stats = Stats()
 
+    decompilation_stats = DecompileStats()
+
     if args.test_options:
         with open(args.test_options, "r") as rf:
             anvill_stats.load_rules(rf)
@@ -272,7 +313,8 @@ def anvill_decomp_main(args, source_path, dest_path):
 
     max_items_decompile = len(sources_decompile)
 
-    apply_anvill_decomp = partial(run_anvill_decompile, args.anvill_decompile, dest_path, args.only_fails, source_path_decompile, anvill_stats)
+    apply_anvill_decomp = partial(run_anvill_decompile, args.anvill_decompile,
+                                  dest_path, args.only_fails, source_path_decompile, anvill_stats, decompilation_stats)
 
     with ThreadPool(num_cpus) as p:
         with tqdm(total=max_items_decompile) as pbar:
@@ -281,12 +323,17 @@ def anvill_decomp_main(args, source_path, dest_path):
 
     anvill_stats.set_stat("end_time", str(datetime.now()))
 
+    if args.dump_benchmark:
+        outpath = dest_path.joinpath("decompile_stats.json")
+        decompilation_stats.dump(outpath)
+
     if args.dump_stats:
         outpath = dest_path.joinpath("stats.json")
         anvill_stats.save_json(outpath)
 
     if args.slack_notify:
         dump_via_slack(args, anvill_stats)
+
 
 def dump_via_slack(args, stats):
     slack_msg = Slack(MSG_HOOK)
@@ -304,14 +351,16 @@ def dump_via_slack(args, stats):
         max_num_fails = 10
         slack_msg.add_block(f"Top {max_num_fails}:")
         # verbose is set to False to prevent overly long Slack messages
-        stats.print_fails(fail_count=max_num_fails, output=fail_msg, verbose=False)
+        stats.print_fails(fail_count=max_num_fails,
+                          output=fail_msg, verbose=False)
         fail_output = fail_msg.getvalue()
         if fail_output:
             slack_msg.add_block(fail_output)
         else:
             slack_msg.add_block("<None>")
-    
+
     slack_msg.post()
+
 
 if __name__ == "__main__":
 
@@ -363,6 +412,9 @@ if __name__ == "__main__":
         action="store_true",
         help="Output a stats.json in output directory with run statistics")
 
+    parser.add_argument("--dump-benchmark", default=False,
+                        action="store_true", help="dump aggregated benchmark statistics")
+
     parser.add_argument(
         "--test-options",
         default=None,
@@ -371,14 +423,17 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.test_options and not os.path.exists(args.test_options):
-        sys.stderr.write(f"Test options file [{args.test_options}] was not found\n")
+        sys.stderr.write(
+            f"Test options file [{args.test_options}] was not found\n")
         sys.exit(1)
 
     test_anvill_args = args.anvill_python.split()
     test_anvill_args.append("-h")
-    anvill_test = subprocess.run(test_anvill_args, stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
+    anvill_test = subprocess.run(
+        test_anvill_args, stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
     if anvill_test.returncode != 0:
-        sys.stderr.write(f"Could not find anvill command: {args.anvill_python}\n")
+        sys.stderr.write(
+            f"Could not find anvill command: {args.anvill_python}\n")
         sys.exit(1)
 
     if args.slack_notify:
