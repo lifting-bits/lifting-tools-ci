@@ -86,7 +86,9 @@ then
   for arch in "${ARCHES[@]}"
   do
     bcfile=${RUN_SIZE}.bitcode.${CLANG}.${arch}.tar.xz
-    curl -LO https://anghabench-files-public.nyc3.digitaloceanspaces.com/${CLANG}/${bcfile}
+    url_to_get=https://anghabench-files-public.nyc3.digitaloceanspaces.com/${CLANG}/${bcfile}
+    echo "Fetching [${url_to_get}]"
+    curl -LO ${url_to_get}
   done
 fi
 
@@ -95,7 +97,9 @@ then
   for arch in "${ARCHES[@]}"
   do
     bcfile=${RUN_SIZE}.binaries.${CLANG}.${arch}.tar.xz
-    curl -LO https://anghabench-files-public.nyc3.digitaloceanspaces.com/${CLANG}/${bcfile}
+    url_to_get=https://anghabench-files-public.nyc3.digitaloceanspaces.com/${CLANG}/${bcfile}
+    echo "Fetching [${url_to_get}]"
+    curl -LO ${url_to_get}
   done
 fi
 
