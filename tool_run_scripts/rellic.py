@@ -67,8 +67,6 @@ class RellicCmd(ToolCmd):
         log.debug(f"Setting tmpout to: {self.tmpout}")
         args = [
             self.tool,
-            "--lower_switch",
-            "--remove_phi_nodes",
             "-logtostderr",
             "-input",
             str(self.infile),
