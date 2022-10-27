@@ -6,7 +6,7 @@ import subprocess
 
 log = logging.getLogger("tool_invoker")
 log.addHandler(logging.StreamHandler())
-log.setLevel(logging.INFO)
+log.setLevel(logging.DEBUG)
 
 FILE_NAME_RE = re.compile("([^/\s]+\.[^/\s]+:\d+)")
 PYTHON_ERROR_RE = re.compile('([^/\s]+\.py)", line (\d+)')
@@ -132,7 +132,7 @@ class ToolCmd:
         try:
             # default to 5 min timeout
             timeout_seconds = int(self.stats.rules.get("timeout.seconds", "300"))
-            log.debug(f"Running [{self.cmd}] with a timeout of {timeout_seconds} sec")
+            log.debug(f"Running [{(' '.join(self.cmd))}] with a timeout of {timeout_seconds} sec")
             self.stats.inc_stat("program_runs")
             tool_run = subprocess.run(
                 args=self.cmd,

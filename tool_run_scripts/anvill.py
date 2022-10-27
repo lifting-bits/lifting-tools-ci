@@ -22,8 +22,8 @@ from threading import Lock
 
 log = logging.getLogger("anvill_test_suite")
 log.addHandler(logging.StreamHandler())
-# log.setLevel(logging.DEBUG)
-log.setLevel(logging.INFO)
+log.setLevel(logging.DEBUG)
+#log.setLevel(logging.INFO)
 
 
 MYDIR = path.dirname(path.abspath(__file__))
@@ -33,23 +33,27 @@ VERSION = ""
 # given some input bitocode, run it through anvill record outputs
 
 
-class AnvillPythonCmd(ToolCmd):
+class AnvillGhidraCmd(ToolCmd):
 
     def make_tool_cmd(self):
         f = self.infile.stem
-        jsonfile = f"{self.index}-{f}.json"
+        jsonfile = f"{self.index}-{f}.pb"
         self.tmpout = self.outdir.joinpath("work").joinpath(jsonfile)
 
         # python3 -m anvill --bin_in foo.elf --spec_out foo.json
         log.debug(f"Setting tmpout to: {self.tmpout}")
-        args = self.tool.split()
+        args = [os.path.join(self.tool, "support", "analyzeHeadless")]
+
         args.extend([
-            "--bin_in",
+            "/tmp",
+            f"dummy_ghidra_proj{self.index}-{f}",
+            "-readOnly",
+            "-deleteProject",
+            "-import",
             str(self.infile),
-            "--spec_out",
+            "-postScript",
+            "anvillHeadlessExportScript",
             str(self.tmpout),
-            "--log_file",
-            "/dev/stderr",
         ])
         return args
 
@@ -77,7 +81,7 @@ class AnvillPythonCmd(ToolCmd):
         shutil.copyfile(self.infile, input_name)
 
         if self.rc == 0:
-            output_name = pth.joinpath("output.json")
+            output_name = pth.joinpath("output.pb")
             log.debug(f"Copying {self.tmpout} to {output_name}")
             shutil.copyfile(self.tmpout, output_name)
 
@@ -144,6 +148,7 @@ class AnvillDecompileCmd(ToolCmd):
             str(self.stats_file),
             "-logtostderr",
         ])
+
         return args
 
     def save(self):
@@ -197,9 +202,9 @@ class AnvillDecompileCmd(ToolCmd):
             reprofile.write("\n")
 
 
-def run_anvill_python(anvill, output_dir, failonly, source_path, stats, input_and_idx):
+def run_anvill_ghidra(ghidra_dir, output_dir, failonly, source_path, stats, input_and_idx):
     idx, input_file = input_and_idx
-    cmd = AnvillPythonCmd(anvill, input_file, output_dir,
+    cmd = AnvillGhidraCmd(ghidra_dir, input_file, output_dir,
                           source_path, idx, stats)
 
     retcode = cmd.run()
@@ -273,12 +278,12 @@ def anvill_python_main(args, source_path, dest_path):
     max_items_python = len(sources)
 
     # workspace for anvill-python
-    apply_anvill_python = partial(
-        run_anvill_python, args.anvill_python, dest_path, args.only_fails, source_path, anvill_stats)
+    apply_anvill_ghidra = partial(
+        run_anvill_ghidra, os.path.expanduser(args.ghidra_install_dir), dest_path, args.only_fails, source_path, anvill_stats)
 
     with ThreadPool(num_cpus) as p:
         with tqdm(total=max_items_python) as pbar:
-            for _ in p.imap_unordered(apply_anvill_python, enumerate(sources)):
+            for _ in p.imap_unordered(apply_anvill_ghidra, enumerate(sources)):
                 pbar.update()
 
     anvill_stats.set_stat("end_time", str(datetime.now()))
@@ -293,12 +298,12 @@ def anvill_python_main(args, source_path, dest_path):
 
 def anvill_decomp_main(args, source_path, dest_path):
 
-    sources_decompile = list(source_path.rglob("*.json"))
+    sources_decompile = list(source_path.rglob("*.pb"))
     if sources_decompile:
         workdir_decompile = str(dest_path.joinpath("work"))
         log.debug(f"Making work dir [{workdir_decompile}]")
         os.makedirs(workdir_decompile, exist_ok=True)
-    log.info(f"Found {len(sources_decompile)} JSON specs")
+    log.info(f"Found {len(sources_decompile)} PB specs")
 
     num_cpus = os.cpu_count()
     anvill_stats = Stats()
@@ -371,9 +376,9 @@ if __name__ == "__main__":
     #   --slack-notify
 
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--anvill-python", default="python3 -m anvill", help="Which anvill python frontend to run"
-    )
+
+    parser.add_argument("--ghidra-install-dir", required=True, help="where to find ghidra for headless runs")
+
     parser.add_argument(
         "--anvill-decompile", default="anvill-decompile-json-11.0", help="Which anvill decompiler to run"
     )
@@ -425,15 +430,6 @@ if __name__ == "__main__":
     if args.test_options and not os.path.exists(args.test_options):
         sys.stderr.write(
             f"Test options file [{args.test_options}] was not found\n")
-        sys.exit(1)
-
-    test_anvill_args = args.anvill_python.split()
-    test_anvill_args.append("-h")
-    anvill_test = subprocess.run(
-        test_anvill_args, stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
-    if anvill_test.returncode != 0:
-        sys.stderr.write(
-            f"Could not find anvill command: {args.anvill_python}\n")
         sys.exit(1)
 
     if args.slack_notify:
