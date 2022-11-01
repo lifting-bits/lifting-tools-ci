@@ -136,7 +136,7 @@ class AnvillDecompileCmd(ToolCmd):
         self.stats_file = self.work_dir.joinpath(f"{self.index}-{f}.stats")
         self.tmpout = self.work_dir.joinpath(bcfile)
 
-        # anvill-decompile-json-11.0 -spec <json file> -bc_out <bc_file>
+        # anvill-decompile-spec <json file> -bc_out <bc_file>
         log.debug(f"Setting tmpout to: {self.tmpout}")
         args = self.tool.split()
         args.extend([
@@ -380,7 +380,7 @@ if __name__ == "__main__":
     parser.add_argument("--ghidra-install-dir", required=True, help="where to find ghidra for headless runs")
 
     parser.add_argument(
-        "--anvill-decompile", default="anvill-decompile-json-11.0", help="Which anvill decompiler to run"
+        "--anvill-decompile", default="anvill-decompile-spec", help="Which anvill decompiler to run"
     )
     parser.add_argument(
         "--input-dir",
