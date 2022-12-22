@@ -156,7 +156,7 @@ class ToolCmd:
             self.set_output(-131, tme.stdout, tme.stderr)
             return -131
 
-        if 0 == os.path.getsize(self.tmpout):
+        if not os.path.exists(self.tmpout) or 0 == os.path.getsize(self.tmpout):
             self.set_output(
                 -129, tool_run.stdout, tool_run.stderr + "\n" + "Zero sized output"
             )
