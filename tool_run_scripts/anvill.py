@@ -267,10 +267,10 @@ def anvill_python_main(args, source_path, dest_path):
 
     # get all the bitcode
     log.info(f"Listing files in {str(source_path)}")
-    sources = list(source_path.rglob("*.elf"))
-    # Sometimes we forget the .elf suffix
-    sources.extend(list(source_path.rglob("*.o")))
-    log.info(f"Found {len(sources)} ELF files")
+    # Filter for files that are executable
+    sources = [source for source in source_path.rglob("*") if os.path.isfile(source_path) and os.access(source_path, os.X_OK)]
+
+    log.info(f"Found {len(sources)} Executable files")
 
     # load test to ignore
     anvill_stats.set_stat("start_time", str(datetime.now()))
