@@ -268,7 +268,7 @@ def anvill_python_main(args, source_path, dest_path):
     # get all the bitcode
     log.info(f"Listing files in {str(source_path)}")
     # Filter for files that are executable
-    sources = [source for source in source_path.rglob("*") if os.path.isfile(source_path) and os.access(source_path, os.X_OK)]
+    sources = [source for source in source_path.rglob("*") if os.path.isfile(source) and os.access(source, os.X_OK)]
 
     log.info(f"Found {len(sources)} Executable files")
 
