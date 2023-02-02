@@ -36,8 +36,8 @@ VERSION = ""
 class AnvillGhidraCmd(ToolCmd):
 
     def __init__(self, tool, infile, outdir, source_base, index, stats, language_overrides):
-        super().__init__(tool, infile, outdir, source_base, index, stats)
         self.lang_overrides = language_overrides
+        super().__init__(tool, infile, outdir, source_base, index, stats)
 
     def make_tool_cmd(self):
         f = self.infile.stem
