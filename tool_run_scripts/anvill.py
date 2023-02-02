@@ -35,8 +35,14 @@ VERSION = ""
 
 class AnvillGhidraCmd(ToolCmd):
 
+    def __init__(self, tool, infile, outdir, source_base, index, stats, language_overrides):
+        super().__init__(tool, infile, outdir, source_base, index, stats)
+        self.lang_overrides = language_overrides
+
     def make_tool_cmd(self):
         f = self.infile.stem
+        fullname = self.infile.name
+
         jsonfile = f"{self.index}-{f}.pb"
         self.tmpout = self.outdir.joinpath("work").joinpath(jsonfile)
 
@@ -48,8 +54,9 @@ class AnvillGhidraCmd(ToolCmd):
             "/tmp",
             f"dummy_ghidra_proj{self.index}-{f}",
             "-readOnly",
-            "-deleteProject",
-            "-import",
+            "-deleteProject"]
+            + (["-processor", self.lang_overrides[fullname]] if fullname in self.lang_overrides else [])
+            +["-import",
             str(self.infile),
             "-postScript",
             "anvillHeadlessExportScript",
@@ -202,10 +209,10 @@ class AnvillDecompileCmd(ToolCmd):
             reprofile.write("\n")
 
 
-def run_anvill_ghidra(ghidra_dir, output_dir, failonly, source_path, stats, input_and_idx):
+def run_anvill_ghidra(ghidra_dir, output_dir, failonly, source_path, stats, language_id_overrides, input_and_idx):
     idx, input_file = input_and_idx
     cmd = AnvillGhidraCmd(ghidra_dir, input_file, output_dir,
-                          source_path, idx, stats)
+                          source_path, idx, stats, language_id_overrides)
 
     retcode = cmd.run()
     log.debug(f"Anvill run returned {retcode}")
@@ -261,9 +268,14 @@ def anvill_python_main(args, source_path, dest_path):
     num_cpus = os.cpu_count()
     anvill_stats = Stats()
 
+
+    language_id_overrides = {}
+
     if args.test_options:
         with open(args.test_options, "r") as rf:
             anvill_stats.load_rules(rf)
+            if "language_id_overrides" in anvill_stats.rules:
+                language_id_overrides = anvill_stats.rules['language_id_overrides']
 
     # get all the bitcode
     log.info(f"Listing files in {str(source_path)}")
@@ -279,7 +291,7 @@ def anvill_python_main(args, source_path, dest_path):
 
     # workspace for anvill-python
     apply_anvill_ghidra = partial(
-        run_anvill_ghidra, os.path.expanduser(args.ghidra_install_dir), dest_path, args.only_fails, source_path, anvill_stats)
+        run_anvill_ghidra, os.path.expanduser(args.ghidra_install_dir), dest_path, args.only_fails, source_path, anvill_stats, language_id_overrides)
 
     with ThreadPool(num_cpus) as p:
         with tqdm(total=max_items_python) as pbar:
