@@ -282,7 +282,7 @@ def get_anvill_version(cmd):
         log.error(f"Could not get anvill version: {cpe}")
         sys.exit(1)
     except subprocess.TimeoutExpired as tme:
-        log.error(f"Could not get anvill version: timeout execption")
+        log.error(f"Could not get anvill version: timeout exception")
         sys.exit(1)
 
     return rt.stdout.decode("utf-8")
