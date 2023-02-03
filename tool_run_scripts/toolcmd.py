@@ -9,10 +9,10 @@ log = logging.getLogger("tool_invoker")
 log.addHandler(logging.StreamHandler())
 log.setLevel(logging.DEBUG)
 
-FILE_NAME_RE = re.compile("([^/\s]+\.[^/\s]+:\d+)")
-PYTHON_ERROR_RE = re.compile('([^/\s]+\.py)", line (\d+)')
-ASAN_ERROR_RE = re.compile('AddressSanitizer: [a-zA-Z\-]+ .*/([^:]+:[\d]+)')
-CLANG_ERROR_RE = re.compile("error: ([\w']+) *([\w']*) *([\w']+) *([\w']+)")
+FILE_NAME_RE = re.compile(r"([^/\s]+\.[^/\s]+:\d+)")
+PYTHON_ERROR_RE = re.compile(r'([^/\s]+\.py)", line (\d+)')
+ASAN_ERROR_RE = re.compile(r'AddressSanitizer: [a-zA-Z\-]+ .*/([^:]+:[\d]+)')
+CLANG_ERROR_RE = re.compile(r"error: ([\w']+) *([\w']*) *([\w']+) *([\w']+)")
 
 class ToolCmd(ABC):
     def __init__(self, tool, infile, outdir, source_base, index, stats):
@@ -126,7 +126,7 @@ class ToolCmd(ABC):
             log.debug(f"Unlinking on delete {self.tmpout}")
             try:
                 os.unlink(self.tmpout)
-            except FileNotFoundError as fnf:
+            except FileNotFoundError:
                 log.debug(f"Tried to delete a file that doesn't exist: {self.tmpout}")
 
     def run(self):
