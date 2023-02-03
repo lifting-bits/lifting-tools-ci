@@ -216,7 +216,7 @@ def initialize_ghidra_cache(ghidra_dir):
             "/tmp",
             "dummy_ghidra_proj_init",
             "-readOnly",
-            "-deleteProject"
+            "-deleteProject",
             "-preScript",
             "anvillHeadlessExportScript",
         ])
