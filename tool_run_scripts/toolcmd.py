@@ -1,3 +1,4 @@
+from abc import ABC, abstractmethod
 import re
 import logging
 import signal
@@ -13,7 +14,7 @@ PYTHON_ERROR_RE = re.compile('([^/\s]+\.py)", line (\d+)')
 ASAN_ERROR_RE = re.compile('AddressSanitizer: [a-zA-Z\-]+ .*/([^:]+:[\d]+)')
 CLANG_ERROR_RE = re.compile("error: ([\w']+) *([\w']*) *([\w']+) *([\w']+)")
 
-class ToolCmd:
+class ToolCmd(ABC):
     def __init__(self, tool, infile, outdir, source_base, index, stats):
         self.source_base = source_base
         self.index = index
@@ -32,8 +33,9 @@ class ToolCmd:
         self.out = out
         self.err = err
 
+    @abstractmethod
     def make_tool_cmd(self):
-        raise RuntimeError("Please override make_tool_cmd")
+        pass
     
     def clang_traceback(self, msg):
         if not msg:
