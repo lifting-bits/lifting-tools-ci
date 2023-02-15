@@ -37,7 +37,7 @@ class AnvillGhidraCmd(ToolCmd):
 
     def __init__(self, tool, infile, outdir, source_base, index, stats, language_overrides):
         self.lang_overrides = language_overrides
-        super().__init__(tool, infile, outdir, source_base, index, stats)
+        super().__init__(tool, infile, outdir, source_base, index, stats, False)
 
     def make_tool_cmd(self):
         f = self.infile.stem
@@ -133,7 +133,7 @@ class DecompileStats:
 class AnvillDecompileCmd(ToolCmd):
 
     def __init__(self, tool, infile, outdir, source_base, index, stats, decomp_stats):
-        super().__init__(tool, infile, outdir, source_base, index, stats)
+        super().__init__(tool, infile, outdir, source_base, index, stats, True)
         self.decomp_stats = decomp_stats
 
     def make_tool_cmd(self):

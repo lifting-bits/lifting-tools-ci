@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 import re
+import resource
 import logging
 import signal
 import os
@@ -15,7 +16,7 @@ ASAN_ERROR_RE = re.compile(r'AddressSanitizer: [a-zA-Z\-]+ .*/([^:]+:[\d]+)')
 CLANG_ERROR_RE = re.compile(r"error: ([\w']+) *([\w']*) *([\w']+) *([\w']+)")
 
 class ToolCmd(ABC):
-    def __init__(self, tool, infile, outdir, source_base, index, stats):
+    def __init__(self, tool, infile, outdir, source_base, index, stats, limit_memory):
         self.source_base = source_base
         self.index = index
         self.infile = infile
@@ -27,6 +28,7 @@ class ToolCmd(ABC):
         self.out = None
         self.err = None
         self.stats = stats
+        self.limit_memory = limit_memory
 
     def set_output(self, rc, out, err):
         self.rc = rc
@@ -131,6 +133,12 @@ class ToolCmd(ABC):
 
     def run(self):
 
+        def set_memory_limit():
+            default_memory_limit = 8e9
+            memory_limit = int(self.stats.rules.get("memory.bytes", default_memory_limit))
+            resource.setrlimit(resource.RLIMIT_AS, (memory_limit, memory_limit))
+            log.debug(f"Setting memory limit for {os.getpid()}: {memory_limit}")
+
         try:
             # default to 5 min timeout
             timeout_seconds = int(self.stats.rules.get("timeout.seconds", "300"))
@@ -143,6 +151,7 @@ class ToolCmd(ABC):
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 timeout=timeout_seconds,
+                preexec_fn=set_memory_limit if self.limit_memory else None,
             )
         except OSError as oe:
             log.debug("Tool invocation hit OS error")
