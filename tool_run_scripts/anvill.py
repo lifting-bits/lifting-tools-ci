@@ -59,6 +59,8 @@ class AnvillGhidraCmd(ToolCmd):
             +["-import",
             str(self.infile),
             "-postScript",
+            "FixGlobalRegister"
+            "-postScript",
             "anvillHeadlessExportScript",
             str(self.tmpout),
         ])
