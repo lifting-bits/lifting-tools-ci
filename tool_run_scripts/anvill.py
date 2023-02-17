@@ -155,6 +155,7 @@ class AnvillDecompileCmd(ToolCmd):
             str(self.tmpout),
             "-stats_out",
             str(self.stats_file),
+            "-remove_next_pc_assignments",
             "-logtostderr",
         ])
 
