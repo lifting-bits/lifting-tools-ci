@@ -31,6 +31,14 @@ class Stats:
 
         return False
 
+    def should_skip(self, filepath):
+        skipped_items = self.rules.get("tests.skip", [])
+        for s in skipped_items:
+            if s in filepath:
+                return True
+
+        return False
+
     def print_fails(self, fail_count=5, output=None, verbose=True):
         if output is None:
             output = sys.stderr

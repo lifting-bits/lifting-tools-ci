@@ -305,8 +305,11 @@ def anvill_python_main(args, source_path, dest_path):
     log.info(f"Listing files in {str(source_path)}")
     # Filter for files that are executable
     sources = [source for source in source_path.rglob("*") if source.is_file() and os.access(source, os.X_OK) and not source.name.startswith(".")]
+    skipped_sources = {source for source in sources if anvill_stats.should_skip(str(source))}
 
-    log.info(f"Found {len(sources)} Executable files")
+    log.info(f"Found {len(sources)} Executable files, Skipping {len(skipped_sources)}")
+
+    sources = [source for source in sources if source not in skipped_sources]
 
     # load test to ignore
     anvill_stats.set_stat("start_time", str(datetime.now()))
