@@ -292,7 +292,6 @@ def get_anvill_version(cmd):
 
 
 def anvill_python_main(args, source_path, dest_path):
-    num_cpus = os.cpu_count()
     anvill_stats = Stats()
 
 
@@ -323,7 +322,7 @@ def anvill_python_main(args, source_path, dest_path):
     apply_anvill_ghidra = partial(
         run_anvill_ghidra, os.path.expanduser(args.ghidra_install_dir), dest_path, args.only_fails, source_path, anvill_stats, language_id_overrides)
 
-    with ThreadPool(num_cpus) as p:
+    with ThreadPool(args.jobs) as p:
         with tqdm(total=max_items_python) as pbar:
             for _ in p.imap_unordered(apply_anvill_ghidra, enumerate(sources)):
                 pbar.update()
@@ -347,7 +346,6 @@ def anvill_decomp_main(args, source_path, dest_path):
         os.makedirs(workdir_decompile, exist_ok=True)
     log.info(f"Found {len(sources_decompile)} PB specs")
 
-    num_cpus = os.cpu_count()
     anvill_stats = Stats()
 
     decompilation_stats = DecompileStats()
@@ -363,7 +361,7 @@ def anvill_decomp_main(args, source_path, dest_path):
     apply_anvill_decomp = partial(run_anvill_decompile, args.anvill_decompile,
                                   dest_path, args.only_fails, source_path_decompile, anvill_stats, decompilation_stats)
 
-    with ThreadPool(num_cpus) as p:
+    with ThreadPool(args.jobs) as p:
         with tqdm(total=max_items_decompile) as pbar:
             for _ in p.imap_unordered(apply_anvill_decomp, enumerate(sources_decompile)):
                 pbar.update()
@@ -466,6 +464,12 @@ if __name__ == "__main__":
         "--test-options",
         default=None,
         help="A JSON file specifying tests to ignore or expect to fail")
+
+    parser.add_argument(
+        "-j", "--jobs",
+        type=int,
+        default=os.cpu_count(),
+        help="The number of jobs that can run concurrently; defaults to the system's CPU count")
 
     args = parser.parse_args()
 
