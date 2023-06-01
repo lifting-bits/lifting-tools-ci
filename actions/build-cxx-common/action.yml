@@ -50,6 +50,6 @@ runs:
       shell: "bash"
       run: >
         ./vcpkg/vcpkg install sqlite3 cpprestsdk
-    - run: ./build_dependencies.sh --release --export-dir ${{ inputs.target-export-path }} ${{ matrix.llvm }} --debug
+    - run: ./build_dependencies.sh --release --export-dir ${{ inputs.target-export-path }} llvm-${{ matrix.llvm }} --debug
       working-directory: cxx-common
       shell: bash
