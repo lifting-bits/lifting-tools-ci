@@ -46,12 +46,7 @@ runs:
         mono `./vcpkg/vcpkg fetch nuget | tail -n 1` \
           setapikey "${{ inputs.gh-token }}" \
           -source "https://nuget.pkg.github.com/lifting-bits/index.json"
-    # Omit this step if you're using manifests
-    - name: "vcpkg package restore"
-      working-directory: cxx-common
-      shell: "bash"
-      run: >
+
         ./vcpkg/vcpkg install sqlite3 cpprestsdk
-    - run: ./build_dependencies.sh --release --export-dir ${{ inputs.target-export-path }} llvm-${{ matrix.llvm }} --debug
-      working-directory: cxx-common
-      shell: bash
+
+        ./build_dependencies.sh --release --export-dir ${{ inputs.target-export-path }} llvm-${{ matrix.llvm }} --debug
