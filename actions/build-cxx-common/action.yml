@@ -4,11 +4,9 @@ inputs:
   target-export-path: # id of input
     description: "where to export the cxx-common build"
     required: true
-outputs:
-  random-number:
-    description: "Random number"
-    value: ${{ steps.random-number-generator.outputs.random-number }}
-
+  gh-token:
+    description: "token for the target nuget cache"
+    required: true
 runs:
   using: "composite"
   steps:
@@ -26,18 +24,18 @@ runs:
       run: |
         mono `./vcpkg/vcpkg fetch nuget | tail -n 1` \
           sources add \
-          -source "https://nuget.pkg.github.com/<OWNER>/index.json" \
+          -source "https://nuget.pkg.github.com/lifting-bits/index.json" \
           -storepasswordincleartext \
           -name "GitHub" \
           -username "lifting-bits" \
-          -password "${{ secrets.GITHUB_TOKEN }}"
+          -password "${{ inputs.gh-token }}"
         mono `./vcpkg/vcpkg fetch nuget | tail -n 1` \
-          setapikey "${{ secrets.GITHUB_TOKEN }}" \
-          -source "https://nuget.pkg.github.com/<OWNER>/index.json"
+          setapikey "${{ inputs.gh-token }}" \
+          -source "https://nuget.pkg.github.com/lifting-bits/index.json"
     # Omit this step if you're using manifests
     - name: "vcpkg package restore"
       shell: "bash"
       run: >
         ./vcpkg/vcpkg install sqlite3 cpprestsdk
-    - run: ./build_dependencies.sh --release --export-dir ./${{ env.ARTIFACT_NAME }} ${{ matrix.llvm }} --clean-after-build --debug
+    - run: ./build_dependencies.sh --release --export-dir ${{ inputs.target-export-path }} ${{ matrix.llvm }} --debug
       shell: bash

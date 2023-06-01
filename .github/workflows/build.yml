@@ -38,10 +38,6 @@ jobs:
     container:
       image: docker.pkg.github.com/lifting-bits/cxx-common/vcpkg-builder-${{ matrix.image.name }}:${{ matrix.image.tag }}
 
-      credentials:
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
-
     steps:
       - uses: actions/checkout@v3
       - uses: ./actions/build-cxx-common
