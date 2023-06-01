@@ -15,6 +15,15 @@ runs:
         submodules: true
         path: cxx-common
         repository: "lifting-bits/cxx-common"
+
+    - name: Initialize vcpkg
+      shell: bash
+      working-directory: cxx-common
+      run: |
+        { read -r vcpkg_repo_url && read -r vcpkg_commit; } <./vcpkg_info.txt || exit 1
+        git clone "${vcpkg_repo_url}"
+        git -C vcpkg checkout "${vcpkg_commit}"
+        echo "VCPKG_ROOT=$(pwd)/vcpkg" >> $GITHUB_ENV
     - name: "Bootstrap vcpkg"
       shell: "bash"
       working-directory: cxx-common
