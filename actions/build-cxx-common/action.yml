@@ -47,6 +47,6 @@ runs:
           setapikey "${{ inputs.gh-token }}" \
           -source "https://nuget.pkg.github.com/lifting-bits/index.json"
 
-        ./vcpkg/vcpkg install sqlite3 cpprestsdk
+        ./vcpkg/vcpkg install sqlite3 cpprestsdk --debug
 
         ./build_dependencies.sh --release --export-dir ${{ inputs.target-export-path }} llvm-${{ matrix.llvm }} --debug
