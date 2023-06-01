@@ -27,7 +27,6 @@ on:
 jobs:
   build_linux:
     strategy:
-      fail-fast: false
       matrix:
         image:
           - { name: "ubuntu", tag: "22.04" }

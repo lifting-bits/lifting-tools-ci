@@ -13,14 +13,16 @@ runs:
     - uses: actions/checkout@v3
       with:
         submodules: true
+        path: cxx-common
         repository: "lifting-bits/cxx-common"
     - name: "Bootstrap vcpkg"
       shell: "bash"
+      working-directory: cxx-common
       run: |
         ./vcpkg/bootstrap-vcpkg.sh
     - name: "Setup NuGet Credentials"
       shell: "bash"
-      # Replace <OWNER> with your organization name
+      working-directory: cxx-common
       run: |
         mono `./vcpkg/vcpkg fetch nuget | tail -n 1` \
           sources add \
@@ -34,6 +36,7 @@ runs:
           -source "https://nuget.pkg.github.com/lifting-bits/index.json"
     # Omit this step if you're using manifests
     - name: "vcpkg package restore"
+      working-directory: cxx-common
       shell: "bash"
       run: >
         ./vcpkg/vcpkg install sqlite3 cpprestsdk
