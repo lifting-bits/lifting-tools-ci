@@ -36,7 +36,9 @@ runs:
       shell: "bash"
       working-directory: cxx-common
       run: |
-        export GITHUB_REPOSITORY=""
+        unset GITHUB_REPOSITORY
+        unset GITHUB_SERVER_URL
+
         mono `./vcpkg/vcpkg fetch nuget | tail -n 1` \
           sources add \
           -source "https://nuget.pkg.github.com/lifting-bits/index.json" \
