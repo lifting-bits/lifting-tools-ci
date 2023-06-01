@@ -37,7 +37,7 @@ while [[ $# -gt 0 ]] ; do
 done
 
 curl -LO https://tob-amp-share.nyc3.digitaloceanspaces.com/challenge-binaries-latest.tar.xz.gpg
-gpg --no-tty --batch --pinentry-mode loopback --passphrase "${TOB_AMP_PASSPHRASE}" \
+gpg --no-tty --batch --yes --pinentry-mode loopback --passphrase "${TOB_AMP_PASSPHRASE}" \
 	-o challenge-binaries-latest.tar.xz \
 	--decrypt challenge-binaries-latest.tar.xz.gpg
 rm -rf challenge-binaries-latest.tar.xz.gpg
