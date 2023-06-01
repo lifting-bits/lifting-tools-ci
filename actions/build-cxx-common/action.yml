@@ -13,7 +13,7 @@ runs:
     - uses: actions/checkout@v3
       with:
         submodules: true
-        repository: "https://github.com/lifting-bits/cxx-common.git"
+        repository: "lifting-bits/cxx-common"
     - name: "Bootstrap vcpkg"
       shell: "bash"
       run: |
