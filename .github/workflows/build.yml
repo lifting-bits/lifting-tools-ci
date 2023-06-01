@@ -1,0 +1,50 @@
+#
+# Copyright (c) 2019-present, Trail of Bits, Inc.
+# All rights reserved.
+#
+# This source code is licensed in accordance with the terms specified in
+# the LICENSE file found in the root directory of this source tree.
+#
+
+name: Build
+
+on:
+  # Run this workflow once every 6 hours against the master branch
+  #schedule:
+  # - cron: "0 */6 * * *"
+
+  push:
+    branches:
+      - "*"
+
+    tags:
+      - "*"
+
+  pull_request:
+    branches:
+      - "*"
+
+jobs:
+  build_linux:
+    needs: cleanup_stale_workflows
+
+    strategy:
+      fail-fast: false
+      matrix:
+        image:
+          - { name: "ubuntu", tag: "22.04" }
+        llvm: ["16"]
+        cxxcommon_version: ["v0.3.2"]
+
+    runs-on:
+      labels: gha-ubuntu-32
+    container:
+      image: docker.pkg.github.com/lifting-bits/cxx-common/vcpkg-builder-${{ matrix.image.name }}:${{ matrix.image.tag }}
+
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./actions/build-cxx-common
