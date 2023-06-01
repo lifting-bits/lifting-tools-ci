@@ -24,6 +24,7 @@ runs:
         git clone "${vcpkg_repo_url}"
         git -C vcpkg checkout "${vcpkg_commit}"
         echo "VCPKG_ROOT=$(pwd)/vcpkg" >> $GITHUB_ENV
+        echo "VCPKG_DISABLE_METRICS=1 >> $GITHUB_ENV"
     - name: "Bootstrap vcpkg"
       shell: "bash"
       working-directory: cxx-common
@@ -50,4 +51,5 @@ runs:
       run: >
         ./vcpkg/vcpkg install sqlite3 cpprestsdk
     - run: ./build_dependencies.sh --release --export-dir ${{ inputs.target-export-path }} ${{ matrix.llvm }} --debug
+      working-directory: cxx-common
       shell: bash
