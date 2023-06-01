@@ -25,6 +25,7 @@ runs:
         git -C vcpkg checkout "${vcpkg_commit}"
         echo "VCPKG_ROOT=$(pwd)/vcpkg" >> $GITHUB_ENV
         echo "VCPKG_DISABLE_METRICS=1 >> $GITHUB_ENV"
+        echo "VCPKG_USE_NUGET_CACHE=1 >> $GITHUB_ENV"
     - name: "Bootstrap vcpkg"
       shell: "bash"
       working-directory: cxx-common
