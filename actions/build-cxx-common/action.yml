@@ -27,6 +27,7 @@ runs:
         echo "VCPKG_DISABLE_METRICS=1" >> $GITHUB_ENV
         echo "VCPKG_USE_NUGET_CACHE=1" >> $GITHUB_ENV
         echo "VCPKG_BINARY_SOURCES=clear;nuget,GitHub,readwrite;nugettimeout,3601" >> $GITHUB_ENV
+        echo "VCPKG_NUGET_REPOSITORY=''" >> $GITHUB_ENV
     - name: "Bootstrap vcpkg"
       shell: "bash"
       working-directory: cxx-common
@@ -36,9 +37,6 @@ runs:
       shell: "bash"
       working-directory: cxx-common
       run: |
-        unset GITHUB_REPOSITORY
-        unset GITHUB_SERVER_URL
-
         mono `./vcpkg/vcpkg fetch nuget | tail -n 1` \
           sources add \
           -source "https://nuget.pkg.github.com/lifting-bits/index.json" \
