@@ -66,6 +66,16 @@ class AnvillGhidraCmd(ToolCmd):
         ])
         return args
 
+    def make_env(self) -> dict[str, str]:
+        # glibc preallocates arenas per thread to improve allocation performance. For machines with
+        # a high core count, this can dwarf the amount of memory used by the JVM's heap or
+        # internals. This is a problem when running on environments like GHA with a hard memory
+        # constraint as jobs will be repeatedly killed. We should set `MALLOC_ARENA_MAX` to limit
+        # the number of arenas that glibc is allowed to allocate.
+        #
+        #   https://thehftguy.com/2020/05/21/major-bug-in-glibc-is-killing-applications-with-a-memory-limit/
+        return {"MALLOC_ARENA_MAX": "4"}
+
     def save(self):
         if self.rc is None:
             raise RuntimeError("Return code never set")

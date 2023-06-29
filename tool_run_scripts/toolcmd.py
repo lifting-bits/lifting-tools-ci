@@ -23,6 +23,7 @@ class ToolCmd(ABC):
         self.tool = tool
         self.tmpout = None
         self.cmd = self.make_tool_cmd()
+        self.env = self.make_env()
         self.rc = None
         self.out = None
         self.err = None
@@ -36,7 +37,12 @@ class ToolCmd(ABC):
     @abstractmethod
     def make_tool_cmd(self):
         pass
-    
+
+    def make_env(self) -> dict[str, str]:
+        # Override this method if the tool requires environment variables to be applied on top of
+        # the current environment.
+        return {}
+
     def clang_traceback(self, msg):
         if not msg:
             return None
@@ -136,6 +142,12 @@ class ToolCmd(ABC):
             timeout_seconds = int(self.stats.rules.get("timeout.seconds", "300"))
             log.debug(f"Running [{(' '.join(self.cmd))}] with a timeout of {timeout_seconds} sec")
             self.stats.inc_stat("program_runs")
+
+            # Set any environment variables required by the tool.
+            env = os.environ.copy()
+            for key, val in self.make_env().items():
+                env[key] = val
+
             tool_run = subprocess.run(
                 args=self.cmd,
                 universal_newlines=True,
@@ -143,6 +155,7 @@ class ToolCmd(ABC):
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 timeout=timeout_seconds,
+                env=env
             )
         except OSError as oe:
             log.debug("Tool invocation hit OS error")
