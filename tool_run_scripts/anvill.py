@@ -317,6 +317,9 @@ def anvill_python_main(args, source_path, dest_path):
     # Filter for files that are executable
     sources = [source for source in source_path.rglob("*") if source.is_file() and os.access(source, os.X_OK) and not source.name.startswith(".")]
 
+    # Add objects to source list. This is required for AnghaBench.
+    sources.extend(list(source_path.rglob("*.o")))
+
     log.info(f"Found {len(sources)} Executable files")
 
     # load test to ignore

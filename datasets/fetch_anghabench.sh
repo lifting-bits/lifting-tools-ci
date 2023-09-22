@@ -16,7 +16,7 @@ function Help
   echo ""
   echo "Options:"
   echo "  --clang           Which version of clang built the dataset [${CLANG}]"
-  echo "  --run-size        How many binaries (choices: 1k, 1m)"
+  echo "  --run-size        How many binaries (choices: 50, 1k, 1m)"
   echo "  --bitcode         Fetch bitcode"
   echo "  --binaries        Fetch binaries (ELF .o)"
   echo "  -h --help         Print help."
