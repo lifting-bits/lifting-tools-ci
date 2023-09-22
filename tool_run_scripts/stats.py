@@ -83,7 +83,7 @@ class Stats:
         program_runs = self.stats.get("program_runs", 0)
         ignored_outputs = len(self.stats.get("outputignore_success", []))
         ignored_outputs += len(self.stats.get("outputignore_fail", []))
-        return (program_runs - ignored_outputs) - success_runs
+        return program_runs - ignored_outputs - success_runs
 
     def print_stats(self, output=None):
         # emit start/end time

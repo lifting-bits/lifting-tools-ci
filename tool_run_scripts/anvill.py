@@ -35,8 +35,14 @@ VERSION = ""
 
 class AnvillGhidraCmd(ToolCmd):
 
+    def __init__(self, tool, infile, outdir, source_base, index, stats, language_overrides):
+        self.lang_overrides = language_overrides
+        super().__init__(tool, infile, outdir, source_base, index, stats)
+
     def make_tool_cmd(self):
         f = self.infile.stem
+        fullname = self.infile.name
+
         jsonfile = f"{self.index}-{f}.pb"
         self.tmpout = self.outdir.joinpath("work").joinpath(jsonfile)
 
@@ -48,14 +54,27 @@ class AnvillGhidraCmd(ToolCmd):
             "/tmp",
             f"dummy_ghidra_proj{self.index}-{f}",
             "-readOnly",
-            "-deleteProject",
-            "-import",
+            "-deleteProject"]
+            + (["-processor", self.lang_overrides[fullname]] if fullname in self.lang_overrides else [])
+            +["-import",
             str(self.infile),
+            "-postScript",
+            "FixGlobalRegister",
             "-postScript",
             "anvillHeadlessExportScript",
             str(self.tmpout),
         ])
         return args
+
+    def make_env(self) -> dict[str, str]:
+        # glibc preallocates arenas per thread to improve allocation performance. For machines with
+        # a high core count, this can dwarf the amount of memory used by the JVM's heap or
+        # internals. This is a problem when running on environments like GHA with a hard memory
+        # constraint as jobs will be repeatedly killed. We should set `MALLOC_ARENA_MAX` to limit
+        # the number of arenas that glibc is allowed to allocate.
+        #
+        #   https://thehftguy.com/2020/05/21/major-bug-in-glibc-is-killing-applications-with-a-memory-limit/
+        return {"MALLOC_ARENA_MAX": "4"}
 
     def save(self):
         if self.rc is None:
@@ -201,11 +220,35 @@ class AnvillDecompileCmd(ToolCmd):
             reprofile.write(" ".join(self.cmd))
             reprofile.write("\n")
 
+# Run the script with no input to trigger script compilation so it gets saved in the cache
+def initialize_ghidra_cache(ghidra_dir):
+    try:
+        args = [os.path.join(ghidra_dir, "support", "analyzeHeadless")]
+        args.extend([
+            "/tmp",
+            "dummy_ghidra_proj_init",
+            "-readOnly",
+            "-deleteProject",
+            "-preScript",
+            "anvillHeadlessExportScript",
+        ])
 
-def run_anvill_ghidra(ghidra_dir, output_dir, failonly, source_path, stats, input_and_idx):
+        subprocess.run(args=args)
+    except OSError as oe:
+        log.error(f"Could not initialize ghidra: {oe}")
+        sys.exit(1)
+    except subprocess.CalledProcessError as cpe:
+        log.error(f"Could not initialize: {cpe}")
+        sys.exit(1)
+    except subprocess.TimeoutExpired as tme:
+        log.error(f"Could not initialize ghidra: timeout exception")
+        sys.exit(1)
+
+
+def run_anvill_ghidra(ghidra_dir, output_dir, failonly, source_path, stats, language_id_overrides, input_and_idx):
     idx, input_file = input_and_idx
     cmd = AnvillGhidraCmd(ghidra_dir, input_file, output_dir,
-                          source_path, idx, stats)
+                          source_path, idx, stats, language_id_overrides)
 
     retcode = cmd.run()
     log.debug(f"Anvill run returned {retcode}")
@@ -251,37 +294,47 @@ def get_anvill_version(cmd):
         log.error(f"Could not get anvill version: {cpe}")
         sys.exit(1)
     except subprocess.TimeoutExpired as tme:
-        log.error(f"Could not get anvill version: timeout execption")
+        log.error(f"Could not get anvill version: timeout exception")
         sys.exit(1)
 
     return rt.stdout.decode("utf-8")
 
 
 def anvill_python_main(args, source_path, dest_path):
-    num_cpus = os.cpu_count()
     anvill_stats = Stats()
+
+
+    language_id_overrides = {}
 
     if args.test_options:
         with open(args.test_options, "r") as rf:
             anvill_stats.load_rules(rf)
+            if "language_id_overrides" in anvill_stats.rules:
+                language_id_overrides = anvill_stats.rules['language_id_overrides']
 
     # get all the bitcode
     log.info(f"Listing files in {str(source_path)}")
-    sources = list(source_path.rglob("*.elf"))
-    # Sometimes we forget the .elf suffix
+    # Filter for files that are executable
+    sources = [source for source in source_path.rglob("*") if source.is_file() and os.access(source, os.X_OK) and not source.name.startswith(".")]
+
+    # Add objects to source list. This is required for AnghaBench.
     sources.extend(list(source_path.rglob("*.o")))
-    log.info(f"Found {len(sources)} ELF files")
+
+    log.info(f"Found {len(sources)} Executable files")
 
     # load test to ignore
     anvill_stats.set_stat("start_time", str(datetime.now()))
 
     max_items_python = len(sources)
 
+    # initialize ghidra cache to pre-compile the script
+    initialize_ghidra_cache(os.path.expanduser(args.ghidra_install_dir))
+
     # workspace for anvill-python
     apply_anvill_ghidra = partial(
-        run_anvill_ghidra, os.path.expanduser(args.ghidra_install_dir), dest_path, args.only_fails, source_path, anvill_stats)
+        run_anvill_ghidra, os.path.expanduser(args.ghidra_install_dir), dest_path, args.only_fails, source_path, anvill_stats, language_id_overrides)
 
-    with ThreadPool(num_cpus) as p:
+    with ThreadPool(args.jobs) as p:
         with tqdm(total=max_items_python) as pbar:
             for _ in p.imap_unordered(apply_anvill_ghidra, enumerate(sources)):
                 pbar.update()
@@ -305,7 +358,6 @@ def anvill_decomp_main(args, source_path, dest_path):
         os.makedirs(workdir_decompile, exist_ok=True)
     log.info(f"Found {len(sources_decompile)} PB specs")
 
-    num_cpus = os.cpu_count()
     anvill_stats = Stats()
 
     decompilation_stats = DecompileStats()
@@ -321,7 +373,7 @@ def anvill_decomp_main(args, source_path, dest_path):
     apply_anvill_decomp = partial(run_anvill_decompile, args.anvill_decompile,
                                   dest_path, args.only_fails, source_path_decompile, anvill_stats, decompilation_stats)
 
-    with ThreadPool(num_cpus) as p:
+    with ThreadPool(args.jobs) as p:
         with tqdm(total=max_items_decompile) as pbar:
             for _ in p.imap_unordered(apply_anvill_decomp, enumerate(sources_decompile)):
                 pbar.update()
@@ -424,6 +476,12 @@ if __name__ == "__main__":
         "--test-options",
         default=None,
         help="A JSON file specifying tests to ignore or expect to fail")
+
+    parser.add_argument(
+        "-j", "--jobs",
+        type=int,
+        default=os.cpu_count(),
+        help="The number of jobs that can run concurrently; defaults to the system's CPU count")
 
     args = parser.parse_args()
 

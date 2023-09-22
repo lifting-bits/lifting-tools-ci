@@ -1,3 +1,4 @@
+from abc import ABC, abstractmethod
 import re
 import logging
 import signal
@@ -8,12 +9,12 @@ log = logging.getLogger("tool_invoker")
 log.addHandler(logging.StreamHandler())
 log.setLevel(logging.DEBUG)
 
-FILE_NAME_RE = re.compile("([^/\s]+\.[^/\s]+:\d+)")
-PYTHON_ERROR_RE = re.compile('([^/\s]+\.py)", line (\d+)')
-ASAN_ERROR_RE = re.compile('AddressSanitizer: [a-zA-Z\-]+ .*/([^:]+:[\d]+)')
-CLANG_ERROR_RE = re.compile("error: ([\w']+) *([\w']*) *([\w']+) *([\w']+)")
+FILE_NAME_RE = re.compile(r"([^/\s]+\.[^/\s]+:\d+)")
+PYTHON_ERROR_RE = re.compile(r'([^/\s]+\.py)", line (\d+)')
+ASAN_ERROR_RE = re.compile(r'AddressSanitizer: [a-zA-Z\-]+ .*/([^:]+:[\d]+)')
+CLANG_ERROR_RE = re.compile(r"error: ([\w']+) *([\w']*) *([\w']+) *([\w']+)")
 
-class ToolCmd:
+class ToolCmd(ABC):
     def __init__(self, tool, infile, outdir, source_base, index, stats):
         self.source_base = source_base
         self.index = index
@@ -22,6 +23,7 @@ class ToolCmd:
         self.tool = tool
         self.tmpout = None
         self.cmd = self.make_tool_cmd()
+        self.env = self.make_env()
         self.rc = None
         self.out = None
         self.err = None
@@ -32,9 +34,15 @@ class ToolCmd:
         self.out = out
         self.err = err
 
+    @abstractmethod
     def make_tool_cmd(self):
-        raise RuntimeError("Please override make_tool_cmd")
-    
+        pass
+
+    def make_env(self) -> dict[str, str]:
+        # Override this method if the tool requires environment variables to be applied on top of
+        # the current environment.
+        return {}
+
     def clang_traceback(self, msg):
         if not msg:
             return None
@@ -124,7 +132,7 @@ class ToolCmd:
             log.debug(f"Unlinking on delete {self.tmpout}")
             try:
                 os.unlink(self.tmpout)
-            except FileNotFoundError as fnf:
+            except FileNotFoundError:
                 log.debug(f"Tried to delete a file that doesn't exist: {self.tmpout}")
 
     def run(self):
@@ -134,6 +142,12 @@ class ToolCmd:
             timeout_seconds = int(self.stats.rules.get("timeout.seconds", "300"))
             log.debug(f"Running [{(' '.join(self.cmd))}] with a timeout of {timeout_seconds} sec")
             self.stats.inc_stat("program_runs")
+
+            # Set any environment variables required by the tool.
+            env = os.environ.copy()
+            for key, val in self.make_env().items():
+                env[key] = val
+
             tool_run = subprocess.run(
                 args=self.cmd,
                 universal_newlines=True,
@@ -141,6 +155,7 @@ class ToolCmd:
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 timeout=timeout_seconds,
+                env=env
             )
         except OSError as oe:
             log.debug("Tool invocation hit OS error")

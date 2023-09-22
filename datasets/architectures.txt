@@ -2,3 +2,5 @@ amd64
 armv7
 arm64
 x86
+thumb
+powerpc
