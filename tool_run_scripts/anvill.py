@@ -220,8 +220,7 @@ class AnvillDecompileCmd(ToolCmd):
             reprofile.write(" ".join(self.cmd))
             reprofile.write("\n")
 
-# Run the script with no input to trigger script compilation so it gets saved in the cache
-def initialize_ghidra_cache(ghidra_dir):
+def initialize_script(ghidra_dir, name):
     try:
         args = [os.path.join(ghidra_dir, "support", "analyzeHeadless")]
         args.extend([
@@ -230,7 +229,7 @@ def initialize_ghidra_cache(ghidra_dir):
             "-readOnly",
             "-deleteProject",
             "-preScript",
-            "anvillHeadlessExportScript",
+            name
         ])
 
         subprocess.run(args=args)
@@ -244,6 +243,10 @@ def initialize_ghidra_cache(ghidra_dir):
         log.error(f"Could not initialize ghidra: timeout exception")
         sys.exit(1)
 
+# Run the script with no input to trigger script compilation so it gets saved in the cache
+def initialize_ghidra_cache(ghidra_dir):
+    initialize_script(ghidra_dir, "anvillHeadlessExportScript")
+    initialize_script(ghidra_dir, "FixGlobalRegister")
 
 def run_anvill_ghidra(ghidra_dir, output_dir, failonly, source_path, stats, language_id_overrides, input_and_idx):
     idx, input_file = input_and_idx
