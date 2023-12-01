@@ -4,3 +4,4 @@ arm64
 x86
 thumb
 powerpc
+sparc
