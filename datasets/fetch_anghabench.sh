@@ -3,7 +3,7 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
 set -euo pipefail
 
-CLANG=clang-11
+CLANG=clang-14
 RUN_SIZE=1k
 FETCH_BITCODE="no"
 FETCH_BINARIES="no"
